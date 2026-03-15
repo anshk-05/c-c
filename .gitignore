@@ -1,0 +1,36 @@
+# OS-specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node / Frontend
+node_modules/
+dist/
+.vite/
+.env
+.env.*
+!.env.example
+
+# .NET / C#
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# EF Core
+Migrations/*.Designer.cs
+
+# Logs and Databases
+*.log
+*.db
+*.sqlite
+
+# IDEs
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# Secrets
+appsettings.Development.json
