@@ -24,6 +24,8 @@ Migrations/*.Designer.cs
 # Logs and Databases
 *.log
 *.db
+*.db-shm
+*db-wal
 *.sqlite
 
 # IDEs
