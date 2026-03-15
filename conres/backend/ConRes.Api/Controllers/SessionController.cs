@@ -9,10 +9,12 @@ namespace ConRes.Api.Controllers;
 public class SessionController : ControllerBase
 {
     private readonly SessionService _sessionService;
+    private readonly FileService _fileService;
 
-    public SessionController(SessionService sessionService)
+    public SessionController(SessionService sessionService, FileService fileService)
     {
         _sessionService = sessionService;
+        _fileService = fileService;
     }
 
     [HttpPost("login")]
@@ -74,6 +76,8 @@ public class SessionController : ControllerBase
     [HttpGet("status")]
     public IActionResult GetSystemStatus()
     {
+        var fileStatus = _fileService.GetFileAccessStatus();
+
         var response = new SystemStatusResponse
         {
             ActiveUserIds = _sessionService.GetActiveSessions()
@@ -81,7 +85,10 @@ public class SessionController : ControllerBase
                 .ToList(),
             WaitingUserIds = _sessionService.GetWaitingUserIds().ToList(),
             MaxConcurrentUsers = _sessionService.GetMaxConcurrentUsers(),
-            AvailableSlots = _sessionService.GetAvailableSlots()
+            AvailableSlots = _sessionService.GetAvailableSlots(),
+            ReadingUserIds = fileStatus.ReadingUserIds,
+            WritingUserId = fileStatus.WritingUserId,
+            FileName = fileStatus.FileName
         };
 
         return Ok(response);
