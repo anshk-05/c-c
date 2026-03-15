@@ -20,18 +20,26 @@ public class SessionController : ControllerBase
     {
         var result = await _sessionService.LoginAsync(request.Username);
 
-        if (!result.Success)
+        if (result.Success)
         {
-            return BadRequest(new
+            return Ok(new
+            {
+                message = result.Message,
+                session = result.Session
+            });
+        }
+
+        if (result.Queued)
+        {
+            return StatusCode(StatusCodes.Status202Accepted, new
             {
                 message = result.Message
             });
         }
 
-        return Ok(new
+        return BadRequest(new
         {
-            message = result.Message,
-            session = result.Session
+            message = result.Message
         });
     }
 
@@ -48,6 +56,8 @@ public class SessionController : ControllerBase
             });
         }
 
+        _sessionService.TryPromoteNextWaitingUser();
+
         return Ok(new
         {
             message = "Logout successful."
@@ -58,7 +68,22 @@ public class SessionController : ControllerBase
     public IActionResult GetActiveSessions()
     {
         var sessions = _sessionService.GetActiveSessions();
-
         return Ok(sessions);
+    }
+
+    [HttpGet("status")]
+    public IActionResult GetSystemStatus()
+    {
+        var response = new SystemStatusResponse
+        {
+            ActiveUserIds = _sessionService.GetActiveSessions()
+                .Select(s => s.UserId)
+                .ToList(),
+            WaitingUserIds = _sessionService.GetWaitingUserIds().ToList(),
+            MaxConcurrentUsers = _sessionService.GetMaxConcurrentUsers(),
+            AvailableSlots = _sessionService.GetAvailableSlots()
+        };
+
+        return Ok(response);
     }
 }
