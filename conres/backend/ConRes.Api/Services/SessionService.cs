@@ -7,12 +7,12 @@ namespace ConRes.Api.Services;
 
 public class SessionService
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
     private readonly ConcurrentDictionary<int, SessionInfo> _activeSessions = new();
 
-    public SessionService(IServiceProvider serviceProvider)
+    public SessionService(IDbContextFactory<AppDbContext> dbContextFactory)
     {
-        _serviceProvider = serviceProvider;
+        _dbContextFactory = dbContextFactory;
     }
 
     public async Task<(bool Success, string Message, SessionInfo? Session)> LoginAsync(string username)
@@ -24,8 +24,7 @@ public class SessionService
 
         var normalizedUsername = username.Trim().ToLower();
 
-        using var scope = _serviceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync();
 
         var user = await dbContext.Users
             .FirstOrDefaultAsync(u => u.Username.ToLower() == normalizedUsername);
