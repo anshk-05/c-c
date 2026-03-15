@@ -87,21 +87,23 @@ public class SessionService
 
         return (true, false, "Login successful.", session);
     }
-
+    
     public bool Logout(int userId)
     {
         var removed = _activeSessions.TryRemove(userId, out _);
 
         if (!removed)
-        {
             return false;
-        }
 
         _loginSemaphore.Release();
 
         lock (_queueLock)
         {
-            _waitingUserIds.Remove(userId);
+            if (_waitingQueue.Count > 0)
+            {
+                var nextUser = _waitingQueue.Dequeue();
+                _waitingUserIds.Remove(nextUser);
+            }
         }
 
         return true;
