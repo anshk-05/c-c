@@ -46,7 +46,7 @@ public class SessionController : ControllerBase
     }
 
     [HttpPost("logout")]
-    public async Task<IActionResult> Logout([FromBody] LogoutRequest request)
+    public IActionResult Logout([FromBody] LogoutRequest request)
     {
         var success = _sessionService.Logout(request.UserId);
 
@@ -57,8 +57,6 @@ public class SessionController : ControllerBase
                 message = "Active session not found."
             });
         }
-
-        await _sessionService.TryPromoteNextWaitingUserAsync();
 
         return Ok(new
         {

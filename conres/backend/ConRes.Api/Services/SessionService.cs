@@ -10,6 +10,7 @@ public class SessionService
     private const int MaxConcurrentUsers = 4;
 
     private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
+    private readonly ConcurrentDictionary<int, UserSession> _userSessions = new();
     private readonly ConcurrentDictionary<int, SessionInfo> _activeSessions = new();
     private readonly SemaphoreSlim _loginSemaphore = new(MaxConcurrentUsers, MaxConcurrentUsers);
 
@@ -46,57 +47,45 @@ public class SessionService
             return (false, false, "User ID and username do not match any registered user.", null);
         }
 
-        if (_activeSessions.ContainsKey(user.Id))
+        if (_userSessions.TryGetValue(user.Id, out var existingSession))
         {
-            return (false, false, "User is already logged in.", null);
-        }
-
-        lock (_queueLock)
-        {
-            if (_waitingUserIds.Contains(user.Id))
+            return existingSession.State switch
             {
-                return (false, true, "User is already in the waiting queue.", null);
-            }
+                UserSessionState.Active => (false, false, "User is already logged in.", null),
+                UserSessionState.Waiting => (false, true, "User is already in the waiting queue.", null),
+                _ => (false, false, "User already has a session in progress.", null)
+            };
         }
 
-        var entered = await _loginSemaphore.WaitAsync(0);
+        var userSession = new UserSession(
+            user,
+            _loginSemaphore,
+            MarkUserAsWaiting,
+            RemoveWaitingUser,
+            MarkUserAsActive,
+            CompleteSession);
 
-        if (!entered)
+        if (!_userSessions.TryAdd(user.Id, userSession))
         {
-            lock (_queueLock)
-            {
-                if (_waitingUserIds.Add(user.Id))
-                {
-                    _waitingQueue.Enqueue(user.Id);
-                }
-            }
-
-            return (false, true, "No slot available. User added to waiting queue.", null);
-        }
-
-        var session = CreateSession(user);
-
-        var added = _activeSessions.TryAdd(user.Id, session);
-
-        if (!added)
-        {
-            _loginSemaphore.Release();
             return (false, false, "Could not create session.", null);
         }
 
-        return (true, false, "Login successful.", session);
+        var startResult = await userSession.StartAsync();
+
+        if (!startResult.Success && !startResult.Queued)
+        {
+            _userSessions.TryRemove(user.Id, out _);
+        }
+
+        return (startResult.Success, startResult.Queued, startResult.Message, startResult.Session);
     }
     
     public bool Logout(int userId)
     {
-        var removed = _activeSessions.TryRemove(userId, out _);
-
-        if (!removed)
+        if (!_userSessions.TryGetValue(userId, out var userSession))
             return false;
 
-        _loginSemaphore.Release();
-
-        return true;
+        return userSession.RequestLogout();
     }
 
     public IReadOnlyCollection<SessionInfo> GetActiveSessions()
@@ -125,116 +114,55 @@ public class SessionService
         return MaxConcurrentUsers;
     }
 
-    public async Task<SessionInfo?> TryPromoteNextWaitingUserAsync()
+    private void MarkUserAsWaiting(int userId)
     {
-        int? nextUserId;
-
         lock (_queueLock)
         {
-            nextUserId = PeekNextWaitingUserIdUnsafe();
-        }
-
-        if (!nextUserId.HasValue)
-        {
-            return null;
-        }
-
-        var entered = await _loginSemaphore.WaitAsync(0);
-
-        if (!entered)
-        {
-            return null;
-        }
-
-        await using var dbContext = await _dbContextFactory.CreateDbContextAsync();
-        var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == nextUserId.Value);
-
-        if (user is null)
-        {
-            lock (_queueLock)
+            if (_waitingUserIds.Add(userId))
             {
-                RemoveWaitingUserUnsafe(nextUserId.Value);
+                _waitingQueue.Enqueue(userId);
+            }
+        }
+    }
+
+    private void RemoveWaitingUser(int userId)
+    {
+        lock (_queueLock)
+        {
+            if (!_waitingUserIds.Remove(userId))
+            {
+                return;
             }
 
-            _loginSemaphore.Release();
-            return null;
-        }
+            var reorderedQueue = new Queue<int>();
 
-        var session = CreateSession(user);
-
-        if (!_activeSessions.TryAdd(user.Id, session))
-        {
-            _loginSemaphore.Release();
-
-            lock (_queueLock)
+            while (_waitingQueue.Count > 0)
             {
-                if (_activeSessions.ContainsKey(user.Id))
+                var queuedUserId = _waitingQueue.Dequeue();
+
+                if (queuedUserId != userId)
                 {
-                    RemoveWaitingUserUnsafe(user.Id);
+                    reorderedQueue.Enqueue(queuedUserId);
                 }
             }
 
-            return null;
-        }
-
-        lock (_queueLock)
-        {
-            RemoveWaitingUserUnsafe(user.Id);
-        }
-
-        return session;
-    }
-
-    private static SessionInfo CreateSession(User user)
-    {
-        return new SessionInfo
-        {
-            UserId = user.Id,
-            Username = user.Username,
-            DisplayName = user.DisplayName,
-            LoginTimeUtc = DateTime.UtcNow
-        };
-    }
-
-    private int? PeekNextWaitingUserIdUnsafe()
-    {
-        while (_waitingQueue.Count > 0)
-        {
-            var nextUserId = _waitingQueue.Peek();
-
-            if (_waitingUserIds.Contains(nextUserId))
+            while (reorderedQueue.Count > 0)
             {
-                return nextUserId;
-            }
-
-            _waitingQueue.Dequeue();
-        }
-
-        return null;
-    }
-
-    private void RemoveWaitingUserUnsafe(int userId)
-    {
-        if (!_waitingUserIds.Remove(userId))
-        {
-            return;
-        }
-
-        var reorderedQueue = new Queue<int>();
-
-        while (_waitingQueue.Count > 0)
-        {
-            var queuedUserId = _waitingQueue.Dequeue();
-
-            if (queuedUserId != userId)
-            {
-                reorderedQueue.Enqueue(queuedUserId);
+                _waitingQueue.Enqueue(reorderedQueue.Dequeue());
             }
         }
+    }
 
-        while (reorderedQueue.Count > 0)
-        {
-            _waitingQueue.Enqueue(reorderedQueue.Dequeue());
-        }
+    private void MarkUserAsActive(SessionInfo session)
+    {
+        RemoveWaitingUser(session.UserId);
+        _activeSessions[session.UserId] = session;
+    }
+
+    private void CompleteSession(int userId)
+    {
+        _activeSessions.TryRemove(userId, out _);
+        RemoveWaitingUser(userId);
+        _userSessions.TryRemove(userId, out _);
     }
 }
