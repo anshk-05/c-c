@@ -22,8 +22,13 @@ public class SessionService
         _dbContextFactory = dbContextFactory;
     }
 
-    public async Task<(bool Success, bool Queued, string Message, SessionInfo? Session)> LoginAsync(string username)
+    public async Task<(bool Success, bool Queued, string Message, SessionInfo? Session)> LoginAsync(int userId, string username)
     {
+        if (userId <= 0)
+        {
+            return (false, false, "User ID is required.", null);
+        }
+
         if (string.IsNullOrWhiteSpace(username))
         {
             return (false, false, "Username is required.", null);
@@ -34,11 +39,11 @@ public class SessionService
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync();
 
         var user = await dbContext.Users
-            .FirstOrDefaultAsync(u => u.Username.ToLower() == normalizedUsername);
+            .FirstOrDefaultAsync(u => u.Id == userId && u.Username.ToLower() == normalizedUsername);
 
         if (user is null)
         {
-            return (false, false, "User not found.", null);
+            return (false, false, "User ID and username do not match any registered user.", null);
         }
 
         if (_activeSessions.ContainsKey(user.Id))
@@ -69,13 +74,7 @@ public class SessionService
             return (false, true, "No slot available. User added to waiting queue.", null);
         }
 
-        var session = new SessionInfo
-        {
-            UserId = user.Id,
-            Username = user.Username,
-            DisplayName = user.DisplayName,
-            LoginTimeUtc = DateTime.UtcNow
-        };
+        var session = CreateSession(user);
 
         var added = _activeSessions.TryAdd(user.Id, session);
 
@@ -96,15 +95,6 @@ public class SessionService
             return false;
 
         _loginSemaphore.Release();
-
-        lock (_queueLock)
-        {
-            if (_waitingQueue.Count > 0)
-            {
-                var nextUser = _waitingQueue.Dequeue();
-                _waitingUserIds.Remove(nextUser);
-            }
-        }
 
         return true;
     }
@@ -135,21 +125,116 @@ public class SessionService
         return MaxConcurrentUsers;
     }
 
-    public bool TryPromoteNextWaitingUser()
+    public async Task<SessionInfo?> TryPromoteNextWaitingUserAsync()
     {
+        int? nextUserId;
+
         lock (_queueLock)
         {
-            while (_waitingQueue.Count > 0)
-            {
-                var nextUserId = _waitingQueue.Dequeue();
+            nextUserId = PeekNextWaitingUserIdUnsafe();
+        }
 
-                if (_waitingUserIds.Remove(nextUserId))
+        if (!nextUserId.HasValue)
+        {
+            return null;
+        }
+
+        var entered = await _loginSemaphore.WaitAsync(0);
+
+        if (!entered)
+        {
+            return null;
+        }
+
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync();
+        var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == nextUserId.Value);
+
+        if (user is null)
+        {
+            lock (_queueLock)
+            {
+                RemoveWaitingUserUnsafe(nextUserId.Value);
+            }
+
+            _loginSemaphore.Release();
+            return null;
+        }
+
+        var session = CreateSession(user);
+
+        if (!_activeSessions.TryAdd(user.Id, session))
+        {
+            _loginSemaphore.Release();
+
+            lock (_queueLock)
+            {
+                if (_activeSessions.ContainsKey(user.Id))
                 {
-                    return true;
+                    RemoveWaitingUserUnsafe(user.Id);
                 }
+            }
+
+            return null;
+        }
+
+        lock (_queueLock)
+        {
+            RemoveWaitingUserUnsafe(user.Id);
+        }
+
+        return session;
+    }
+
+    private static SessionInfo CreateSession(User user)
+    {
+        return new SessionInfo
+        {
+            UserId = user.Id,
+            Username = user.Username,
+            DisplayName = user.DisplayName,
+            LoginTimeUtc = DateTime.UtcNow
+        };
+    }
+
+    private int? PeekNextWaitingUserIdUnsafe()
+    {
+        while (_waitingQueue.Count > 0)
+        {
+            var nextUserId = _waitingQueue.Peek();
+
+            if (_waitingUserIds.Contains(nextUserId))
+            {
+                return nextUserId;
+            }
+
+            _waitingQueue.Dequeue();
+        }
+
+        return null;
+    }
+
+    private void RemoveWaitingUserUnsafe(int userId)
+    {
+        if (!_waitingUserIds.Remove(userId))
+        {
+            return;
+        }
+
+        var reorderedQueue = new Queue<int>();
+
+        while (_waitingQueue.Count > 0)
+        {
+            var queuedUserId = _waitingQueue.Dequeue();
+
+            if (queuedUserId != userId)
+            {
+                reorderedQueue.Enqueue(queuedUserId);
             }
         }
 
-        return false;
+        while (reorderedQueue.Count > 0)
+        {
+            _waitingQueue.Enqueue(reorderedQueue.Dequeue());
+        }
     }
 }

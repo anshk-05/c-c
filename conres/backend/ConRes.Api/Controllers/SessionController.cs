@@ -20,7 +20,7 @@ public class SessionController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var result = await _sessionService.LoginAsync(request.Username);
+        var result = await _sessionService.LoginAsync(request.UserId, request.Username);
 
         if (result.Success)
         {
@@ -46,7 +46,7 @@ public class SessionController : ControllerBase
     }
 
     [HttpPost("logout")]
-    public IActionResult Logout([FromBody] LogoutRequest request)
+    public async Task<IActionResult> Logout([FromBody] LogoutRequest request)
     {
         var success = _sessionService.Logout(request.UserId);
 
@@ -58,7 +58,7 @@ public class SessionController : ControllerBase
             });
         }
 
-        _sessionService.TryPromoteNextWaitingUser();
+        await _sessionService.TryPromoteNextWaitingUserAsync();
 
         return Ok(new
         {

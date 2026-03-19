@@ -2,11 +2,11 @@ import type { SystemStatus } from '../types';
 
 const BASE_URL = 'http://localhost:5044';
 
-export async function login(username: string): Promise<{ userId: number | null; message: string; queued: boolean }> {
+export async function login(userId: number, username: string): Promise<{ userId: number | null; message: string; queued: boolean }> {
   const res = await fetch(`${BASE_URL}/api/session/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username }),
+    body: JSON.stringify({ userId, username }),
   });
 
   const data = await res.json();

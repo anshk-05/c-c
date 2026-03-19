@@ -17,7 +17,7 @@ export default function ControlsPanel() {
     setLoginBusy(true);
     setLoginResult(null);
     try {
-      const res = await login(username);
+      const res = await login(selectedUser, username);
       if (res.queued) {
         setLoginResult({ ok: true, msg: `${username} queued — barrier full` });
       } else {
