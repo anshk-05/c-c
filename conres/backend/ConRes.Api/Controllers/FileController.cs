@@ -15,24 +15,44 @@ public class FileController : ControllerBase
         _fileService = fileService;
     }
 
-    [HttpPost("read")]
-    public async Task<IActionResult> ReadFile([FromBody] FileReadRequest request)
+    [HttpPost("acquireRead")]
+    public async Task<IActionResult> AcquireRead([FromBody] FileReadRequest request, CancellationToken cancellationToken)
     {
-        var result = await _fileService.ReadFileAsync(request.UserId);
+        var result = await _fileService.AcquireReadAsync(request.UserId, cancellationToken);
 
         if (!result.Success)
-        {
-            return BadRequest(new
-            {
-                message = result.Message
-            });
-        }
+            return BadRequest(new { message = result.Message });
 
-        return Ok(new
-        {
-            message = result.Message,
-            content = result.Content
-        });
+        return Ok(new { message = result.Message, content = result.Content });
+    }
+
+    [HttpPost("releaseRead")]
+    public async Task<IActionResult> ReleaseRead([FromBody] FileReadRequest request)
+    {
+        var result = await _fileService.ReleaseReadAsync(request.UserId);
+
+        if (!result.Success)
+            return BadRequest(new { message = result.Message });
+
+        return Ok(new { message = result.Message });
+    }
+
+    [HttpPost("acquireWrite")]
+    public async Task<IActionResult> AcquireWrite([FromBody] FileReadRequest request)
+    {
+        var result = await _fileService.AcquireWriteLockAsync(request.UserId);
+        if (!result.Success)
+            return BadRequest(new { message = result.Message });
+        return Ok(new { message = result.Message });
+    }
+
+    [HttpPost("releaseWrite")]
+    public async Task<IActionResult> ReleaseWrite([FromBody] FileReadRequest request)
+    {
+        var result = await _fileService.ReleaseWriteLockAsync(request.UserId);
+        if (!result.Success)
+            return BadRequest(new { message = result.Message });
+        return Ok(new { message = result.Message });
     }
 
     [HttpPost("write")]

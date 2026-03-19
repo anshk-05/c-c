@@ -16,12 +16,12 @@ public class AppDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.Entity<User>().HasData(
-            new User { Id = 1, Username = "aarav", DisplayName = "Aarav Patel" },
-            new User { Id = 2, Username = "isha", DisplayName = "Isha Sharma" },
-            new User { Id = 3, Username = "dev", DisplayName = "Dev Kumar" },
-            new User { Id = 4, Username = "maya", DisplayName = "Maya Singh" },
-            new User { Id = 5, Username = "rohan", DisplayName = "Rohan Mehta" },
-            new User { Id = 6, Username = "anika", DisplayName = "Anika Nair" }
+            new User { Id = 1, Username = "gojo", DisplayName = "Satoru Gojo" },
+            new User { Id = 2, Username = "sukuna", DisplayName = "Ryomen Sukuna" },
+            new User { Id = 3, Username = "itadori", DisplayName = "Yuji Itadori" },
+            new User { Id = 4, Username = "nobara", DisplayName = "Nobara Kugisaki" },
+            new User { Id = 5, Username = "todo", DisplayName = "Aoi Todo" },
+            new User { Id = 6, Username = "toji", DisplayName = "Toji Fushiguro" }
         );
     }
 }

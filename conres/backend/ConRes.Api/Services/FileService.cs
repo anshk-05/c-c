@@ -28,24 +28,30 @@ public class FileService
         return _sessionService.GetActiveSessions().Any(s => s.UserId == userId);
     }
 
-    public async Task<(bool Success, string Message, string? Content)> ReadFileAsync(int userId)
+    public async Task<(bool Success, string Message, string? Content)> AcquireReadAsync(int userId, CancellationToken ct = default)
     {
         if (!IsUserActive(userId))
-        {
             return (false, "User must be logged in to read the file.", null);
-        }
 
-        // Acquire reader entry: first reader blocks writers by taking _gate.
-        if (!await _readerCountLock.WaitAsync(TimeSpan.FromSeconds(30)))
-            return (false, "Could not acquire read lock.", null);
+        bool alreadyReading;
+        lock (_trackingLock) { alreadyReading = _readingUserIds.Contains(userId); }
+        if (alreadyReading)
+            return (false, "User is already reading.", null);
 
+        await _readerCountLock.WaitAsync(ct);
         try
         {
             if (_readerCount == 0)
             {
-                if (!await _gate.WaitAsync(TimeSpan.FromSeconds(30)))
+                bool acquired = await _gate.WaitAsync(0); 
+                if (!acquired)
                 {
-                    return (false, "Could not acquire read lock (writer active).", null);
+                    int? writerId;
+                    lock (_trackingLock) { writerId = _writingUserId; }
+                    string msg = writerId.HasValue
+                        ? $"File is write-locked — user {writerId} is currently writing."
+                        : "File is write-locked.";
+                    return (false, msg, null);
                 }
             }
             _readerCount++;
@@ -59,39 +65,85 @@ public class FileService
 
         try
         {
-            await Task.Delay(3000);
-            var content = await File.ReadAllTextAsync(_filePath);
+            var content = await File.ReadAllTextAsync(_filePath, ct);
             return (true, "File read successful.", content);
         }
-        finally
+        catch
         {
-            lock (_trackingLock) { _readingUserIds.Remove(userId); }
-
-            // Last reader releases _gate so writers can proceed.
-            await _readerCountLock.WaitAsync();
-            _readerCount--;
-            if (_readerCount == 0)
-                _gate.Release();
-            _readerCountLock.Release();
+            await ReleaseReadAsync(userId);
+            throw;
         }
+    }
+
+    public async Task<(bool Success, string Message)> AcquireWriteLockAsync(int userId)
+    {
+        if (!IsUserActive(userId))
+            return (false, "User must be logged in to write the file.");
+
+        lock (_trackingLock)
+        {
+            if (_writingUserId == userId)
+                return (false, "You are already holding the write lock.");
+            if (_writingUserId != null)
+                return (false, $"File is write-locked — user {_writingUserId} is currently writing.");
+        }
+
+        bool acquired = await _gate.WaitAsync(0); // non-blocking
+        if (!acquired)
+        {
+            int count;
+            lock (_trackingLock) { count = _readingUserIds.Count; }
+            return (false, count > 0
+                ? $"File is read-locked — {count} user(s) are currently reading. Wait for them to finish."
+                : "File is currently locked.");
+        }
+
+        lock (_trackingLock) { _writingUserId = userId; }
+        return (true, "Write lock acquired.");
+    }
+
+    public Task<(bool Success, string Message)> ReleaseWriteLockAsync(int userId)
+    {
+        lock (_trackingLock)
+        {
+            if (_writingUserId != userId)
+                return Task.FromResult((false, "You do not hold the write lock."));
+            _writingUserId = null;
+        }
+        _gate.Release();
+        return Task.FromResult((true, "Write lock released."));
+    }
+
+    public async Task<(bool Success, string Message)> ReleaseReadAsync(int userId)
+    {
+        bool wasReading;
+        lock (_trackingLock) { wasReading = _readingUserIds.Remove(userId); }
+
+        if (!wasReading)
+            return (false, "User is not currently reading.");
+
+        await _readerCountLock.WaitAsync();
+        _readerCount--;
+        if (_readerCount == 0)
+            _gate.Release();
+        _readerCountLock.Release();
+
+        return (true, "Read lock released.");
     }
 
     public async Task<(bool Success, string Message)> WriteFileAsync(int userId, string content)
     {
         if (!IsUserActive(userId))
-        {
             return (false, "User must be logged in to write to the file.");
-        }
 
         if (string.IsNullOrWhiteSpace(content))
-        {
             return (false, "Content is required.");
+            
+        lock (_trackingLock)
+        {
+            if (_writingUserId != userId)
+                return (false, "Write lock not held. Acquire the write lock first.");
         }
-
-        if (!await _gate.WaitAsync(TimeSpan.FromSeconds(30)))
-            return (false, "Could not acquire write lock.");
-
-        lock (_trackingLock) { _writingUserId = userId; }
 
         try
         {
