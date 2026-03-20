@@ -29,6 +29,9 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+app.Services.GetRequiredService<SessionService>()
+    .SetFileService(app.Services.GetRequiredService<FileService>());
+
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();

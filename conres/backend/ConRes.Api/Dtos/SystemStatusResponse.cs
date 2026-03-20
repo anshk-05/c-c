@@ -9,4 +9,5 @@ public class SystemStatusResponse
     public List<int> ReadingUserIds { get; set; } = new();
     public int? WritingUserId { get; set; }
     public string FileName { get; set; } = string.Empty;
+    public List<QueuedRequest> FileQueue { get; set; } = new();
 }

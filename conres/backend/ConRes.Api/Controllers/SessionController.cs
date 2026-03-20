@@ -86,7 +86,8 @@ public class SessionController : ControllerBase
             AvailableSlots = _sessionService.GetAvailableSlots(),
             ReadingUserIds = fileStatus.ReadingUserIds,
             WritingUserId = fileStatus.WritingUserId,
-            FileName = fileStatus.FileName
+            FileName = fileStatus.FileName,
+            FileQueue = fileStatus.Queue
         };
 
         return Ok(response);

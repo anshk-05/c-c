@@ -38,9 +38,9 @@ public class FileController : ControllerBase
     }
 
     [HttpPost("acquireWrite")]
-    public async Task<IActionResult> AcquireWrite([FromBody] FileReadRequest request)
+    public async Task<IActionResult> AcquireWrite([FromBody] FileReadRequest request, CancellationToken cancellationToken)
     {
-        var result = await _fileService.AcquireWriteLockAsync(request.UserId);
+        var result = await _fileService.AcquireWriteLockAsync(request.UserId, cancellationToken);
         if (!result.Success)
             return BadRequest(new { message = result.Message });
         return Ok(new { message = result.Message });

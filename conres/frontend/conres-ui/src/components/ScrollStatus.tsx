@@ -11,9 +11,10 @@ interface Props {
 }
 
 export default function ScrollStatus({ status }: Props) {
-  const { readingUserIds, writingUserId, fileName } = status;
+  const { readingUserIds, writingUserId, fileName, fileQueue } = status;
   const hasReaders = readingUserIds.length > 0;
   const hasWriter = writingUserId !== null;
+  const queue = fileQueue ?? [];
 
   return (
     <div className="panel h-full">
@@ -38,10 +39,10 @@ export default function ScrollStatus({ status }: Props) {
         }}
       >
         {hasWriter
-          ? 'WRITE LOCK Exclusive access'
+          ? 'WRITE LOCK — Exclusive access'
           : hasReaders
-          ? 'READ LOCK Shared access'
-          : 'UNLOCKED No active access'}
+          ? 'READ LOCK — Shared access'
+          : 'UNLOCKED — No active access'}
       </div>
 
       {/* Readers */}
@@ -71,7 +72,7 @@ export default function ScrollStatus({ status }: Props) {
       </div>
 
       {/* Writer */}
-      <div>
+      <div className="mb-3">
         <div className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
           Writer
         </div>
@@ -87,6 +88,39 @@ export default function ScrollStatus({ status }: Props) {
             }}
           >
             ✍ {userName(writingUserId)} <span className="text-xs opacity-60">#{writingUserId}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Pending queue */}
+      <div>
+        <div className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+          Pending Queue ({queue.length})
+        </div>
+        {queue.length === 0 ? (
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No pending requests.</p>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {queue.map((req) => (
+              <div
+                key={req.position}
+                className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs"
+                style={{
+                  background: req.isWrite ? 'rgba(220,38,38,0.08)' : 'rgba(59,130,246,0.08)',
+                  border: `1px solid ${req.isWrite ? 'rgba(220,38,38,0.3)' : 'rgba(59,130,246,0.3)'}`,
+                  color: req.isWrite ? 'var(--accent-crimson)' : 'var(--accent-blue)',
+                }}
+              >
+                <span
+                  className="font-bold opacity-60"
+                  style={{ minWidth: '1.5rem' }}
+                >
+                  #{req.position}
+                </span>
+                <span className="capitalize font-semibold">{userName(req.userId)}</span>
+                <span className="opacity-60">— {req.isWrite ? '✍ Write' : '📖 Read'}</span>
+              </div>
+            ))}
           </div>
         )}
       </div>

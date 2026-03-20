@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { SystemStatus } from '../types';
 import { acquireRead, releaseRead, writeFile, acquireWrite, releaseWrite } from '../api/fileApi';
 
@@ -15,73 +15,56 @@ interface Props {
 }
 
 export default function ActiveUsers({ status, onScrollRead }: Props) {
-  const { activeUserIds, readingUserIds, writingUserId } = status;
+  const { activeUserIds, readingUserIds, writingUserId, fileQueue } = status;
 
-  // Per-user busy state, write content, and last result
-  const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
-  // Only one user can have the write panel open at a time (frontend write-intent lock)
+
   const [formOpenId, setFormOpenId] = useState<number | null>(null);
   const [writeContent, setWriteContent] = useState<Record<number, string>>({});
   const [opResult, setOpResult] = useState<Record<number, { ok: boolean; msg: string }>>({});
 
-  function setUserBusy(id: number, val: boolean) {
-    setBusyIds((prev) => {
-      const next = new Set(prev);
-      val ? next.add(id) : next.delete(id);
-      return next;
-    });
-  }
+  const [pendingReadIds, setPendingReadIds] = useState<Set<number>>(new Set());
+  const [pendingWriteIds, setPendingWriteIds] = useState<Set<number>>(new Set());
+  // Per-user AbortControllers so we can cancel in-flight requests
+  const abortControllersRef = useRef<Record<number, AbortController>>({});
 
-  async function handleToggleWrite(id: number) {
-    // Cancel: release the write lock and close the panel
-    if (formOpenId === id) {
-      try { await releaseWrite(id); } catch { /* ignore */ }
-      setFormOpenId(null);
-      return;
-    }
-    // Already locked by someone else (reflected in status)
-    if (writingUserId !== null) {
-      setResult(id, { ok: false, msg: `File is write-locked — ${userName(writingUserId)} is writing` });
-      return;
-    }
-    if (formOpenId !== null) {
-      setResult(id, { ok: false, msg: `File is write-locked — ${userName(formOpenId)} has the write panel open` });
-      return;
-    }
-    // Try to acquire the write lock from the backend
-    setUserBusy(id, true);
-    try {
-      await acquireWrite(id);
-      setFormOpenId(id);
-    } catch (e) {
-      setResult(id, { ok: false, msg: e instanceof Error ? e.message : 'Could not acquire write lock' });
-    } finally {
-      setUserBusy(id, false);
-    }
-  }
+  // Users currently submitting file content (writeFile call)
+  const [submittingIds, setSubmittingIds] = useState<Set<number>>(new Set());
 
   function setResult(id: number, result: { ok: boolean; msg: string }) {
     setOpResult((prev) => ({ ...prev, [id]: result }));
-    // Auto-clear after 4 s
-    setTimeout(() => setOpResult((prev) => { const n = { ...prev }; delete n[id]; return n; }), 4000);
+    setTimeout(
+      () => setOpResult((prev) => { const n = { ...prev }; delete n[id]; return n; }),
+      4000,
+    );
+  }
+
+  function queuePosition(id: number, isWrite: boolean): number | null {
+    const entry = fileQueue?.find((q) => q.userId === id && q.isWrite === isWrite);
+    return entry ? entry.position : null;
   }
 
   async function handleRead(id: number) {
-    // Fail fast on the frontend if write lock is known to be held
-    if (writingUserId !== null) {
-      setResult(id, { ok: false, msg: `File is write-locked — ${userName(writingUserId)} is writing` });
+    if (pendingReadIds.has(id)) {
+      abortControllersRef.current[id]?.abort();
       return;
     }
-    setUserBusy(id, true);
+
+    const controller = new AbortController();
+    abortControllersRef.current[id] = controller;
+    setPendingReadIds((prev) => new Set([...prev, id]));
+
     try {
-      const res = await acquireRead(id);
+      const res = await acquireRead(id, controller.signal);
       onScrollRead(res.content);
       setResult(id, { ok: true, msg: 'Reading…' });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Read failed';
-      setResult(id, { ok: false, msg });
+      if (e instanceof Error && e.name === 'AbortError') {
+        setResult(id, { ok: false, msg: 'Read request cancelled' });
+      } else {
+        setResult(id, { ok: false, msg: e instanceof Error ? e.message : 'Read failed' });
+      }
     } finally {
-      setUserBusy(id, false);
+      setPendingReadIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
     }
   }
 
@@ -94,10 +77,40 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
     }
   }
 
+  async function handleToggleWrite(id: number) {
+    if (formOpenId === id) {
+      try { await releaseWrite(id); } catch { /* ignore */ }
+      setFormOpenId(null);
+      return;
+    }
+
+    if (pendingWriteIds.has(id)) {
+      abortControllersRef.current[id]?.abort();
+      return;
+    }
+
+    const controller = new AbortController();
+    abortControllersRef.current[id] = controller;
+    setPendingWriteIds((prev) => new Set([...prev, id]));
+
+    try {
+      await acquireWrite(id, controller.signal);
+      setFormOpenId(id);
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+        setResult(id, { ok: false, msg: 'Write request cancelled' });
+      } else {
+        setResult(id, { ok: false, msg: e instanceof Error ? e.message : 'Could not acquire write lock' });
+      }
+    } finally {
+      setPendingWriteIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
+    }
+  }
+
   async function handleWrite(id: number) {
     const content = writeContent[id]?.trim();
     if (!content) return;
-    setUserBusy(id, true);
+    setSubmittingIds((prev) => new Set([...prev, id]));
     try {
       await writeFile(id, content);
       setResult(id, { ok: true, msg: 'Write complete' });
@@ -107,13 +120,15 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
     } catch (e) {
       setResult(id, { ok: false, msg: e instanceof Error ? e.message : 'Write failed' });
     } finally {
-      setUserBusy(id, false);
+      setSubmittingIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
     }
   }
 
-  function cardState(id: number): 'writer' | 'reader' | 'idle' {
+  function cardState(id: number): 'writer' | 'reader' | 'pendingRead' | 'pendingWrite' | 'idle' {
     if (id === writingUserId) return 'writer';
     if (readingUserIds.includes(id)) return 'reader';
+    if (pendingReadIds.has(id)) return 'pendingRead';
+    if (pendingWriteIds.has(id)) return 'pendingWrite';
     return 'idle';
   }
 
@@ -134,21 +149,54 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
             const state = cardState(id);
             const isWriter = state === 'writer';
             const isReader = state === 'reader';
-            const isBusy = busyIds.has(id);
+            const isPendingRead = state === 'pendingRead';
+            const isPendingWrite = state === 'pendingWrite';
             const isWriteOpen = formOpenId === id;
+            const isSubmitting = submittingIds.has(id);
             const result = opResult[id];
+            const readQueuePos = queuePosition(id, false);
+            const writeQueuePos = queuePosition(id, true);
+
+            const cardBg = isWriter
+              ? 'rgba(220,38,38,0.15)'
+              : isReader
+              ? 'rgba(59,130,246,0.12)'
+              : isPendingRead || isPendingWrite
+              ? 'rgba(245,158,11,0.08)'
+              : 'rgba(255,255,255,0.04)';
+
+            const cardBorder = isWriter
+              ? 'var(--accent-crimson)'
+              : isReader
+              ? 'var(--accent-blue)'
+              : isPendingRead || isPendingWrite
+              ? 'var(--accent-amber)'
+              : 'var(--border-subtle)';
+
+            const cardGlow = isWriter ? 'pulse-crimson' : isReader ? 'glow-blue' : '';
+
+            // Status line text
+            const statusText = isWriter
+              ? '✍ writing…'
+              : isReader
+              ? 'reading…'
+              : isPendingRead
+              ? readQueuePos
+                ? `⌛ queued for read — #${readQueuePos}`
+                : '⌛ waiting for read lock…'
+              : isPendingWrite
+              ? writeQueuePos
+                ? `⌛ queued for write — #${writeQueuePos}`
+                : '⌛ waiting for write lock…'
+              : 'idle';
 
             return (
               <div key={id}>
                 <div
-                  className={`rounded-lg px-4 py-3 ${isWriter ? 'pulse-crimson' : isReader ? 'glow-blue' : ''}`}
+                  className={`rounded-lg px-4 py-3 ${cardGlow}`}
                   style={{
-                    background: isWriter
-                      ? 'rgba(220,38,38,0.15)'
-                      : isReader
-                      ? 'rgba(59,130,246,0.12)'
-                      : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${isWriter ? 'var(--accent-crimson)' : isReader ? 'var(--accent-blue)' : 'var(--border-subtle)'}`,
+                    background: cardBg,
+                    border: `1px solid ${cardBorder}`,
                     borderBottomLeftRadius: isWriteOpen ? 0 : undefined,
                     borderBottomRightRadius: isWriteOpen ? 0 : undefined,
                   }}
@@ -158,22 +206,37 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
                       style={{
-                        background: isWriter ? 'rgba(220,38,38,0.3)' : isReader ? 'rgba(59,130,246,0.3)' : 'rgba(124,58,237,0.2)',
-                        color: isWriter ? 'var(--accent-crimson)' : isReader ? 'var(--accent-blue)' : 'var(--accent-purple)',
+                        background: isWriter
+                          ? 'rgba(220,38,38,0.3)'
+                          : isReader
+                          ? 'rgba(59,130,246,0.3)'
+                          : isPendingRead || isPendingWrite
+                          ? 'rgba(245,158,11,0.25)'
+                          : 'rgba(124,58,237,0.2)',
+                        color: isWriter
+                          ? 'var(--accent-crimson)'
+                          : isReader
+                          ? 'var(--accent-blue)'
+                          : isPendingRead || isPendingWrite
+                          ? 'var(--accent-amber)'
+                          : 'var(--accent-purple)',
                       }}
                     >
                       {id}
                     </div>
 
-                    {/* Name */}
+                    {/* Name + status */}
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold capitalize" style={{ color: 'var(--text-primary)' }}>
                         {userName(id)}
                       </div>
                       <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                        {isWriter ? '✍ writing…' : isReader ? 'reading…' : 'idle'}
+                        {statusText}
                         {result && (
-                          <span className="ml-2" style={{ color: result.ok ? 'var(--accent-green)' : 'var(--accent-crimson)' }}>
+                          <span
+                            className="ml-2"
+                            style={{ color: result.ok ? 'var(--accent-green)' : 'var(--accent-crimson)' }}
+                          >
                             {result.ok ? '✓' : '✗'} {result.msg}
                           </span>
                         )}
@@ -182,7 +245,7 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
 
                     {/* Action buttons */}
                     <div className="flex gap-2 flex-shrink-0">
-                      {/* Read / Stop Reading */}
+                      {/* Read / Stop Reading / Cancel read queue */}
                       {isReader ? (
                         <button
                           onClick={() => handleStopReading(id)}
@@ -195,10 +258,22 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
                         >
                           ■ Stop Reading
                         </button>
+                      ) : isPendingRead ? (
+                        <button
+                          onClick={() => handleRead(id)}
+                          className={btnSm}
+                          style={{
+                            background: 'rgba(245,158,11,0.15)',
+                            border: '1px solid var(--accent-amber)',
+                            color: 'var(--accent-amber)',
+                          }}
+                        >
+                          ⌛ Waiting… ✕
+                        </button>
                       ) : (
                         <button
                           onClick={() => handleRead(id)}
-                          disabled={isBusy}
+                          disabled={isWriter}
                           className={btnSm}
                           style={{
                             background: 'rgba(16,185,129,0.15)',
@@ -206,22 +281,37 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
                             color: 'var(--accent-green)',
                           }}
                         >
-                          {isBusy && !isWriteOpen ? '⏳' : 'Read'}
+                          Read
                         </button>
                       )}
-                      {/* Write — clicking when locked shows an inline message instead of opening a form */}
-                      <button
-                        onClick={() => handleToggleWrite(id)}
-                        disabled={isBusy}
-                        className={btnSm}
-                        style={{
-                          background: isWriteOpen ? 'rgba(220,38,38,0.25)' : 'rgba(220,38,38,0.12)',
-                          border: `1px solid ${isWriteOpen ? 'var(--accent-crimson)' : 'rgba(220,38,38,0.4)'}`,
-                          color: 'var(--accent-crimson)',
-                        }}
-                      >
-                        {isBusy && isWriteOpen ? '⏳' : isWriteOpen ? '✕ Cancel' : (writingUserId !== null || (formOpenId !== null && formOpenId !== id)) ? '🔒 Write' : 'Write'}
-                      </button>
+
+                      {/* Write / Cancel write queue / Cancel form */}
+                      {isPendingWrite ? (
+                        <button
+                          onClick={() => handleToggleWrite(id)}
+                          className={btnSm}
+                          style={{
+                            background: 'rgba(245,158,11,0.15)',
+                            border: '1px solid var(--accent-amber)',
+                            color: 'var(--accent-amber)',
+                          }}
+                        >
+                          ⌛ Waiting… ✕
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleWrite(id)}
+                          disabled={isSubmitting || isReader}
+                          className={btnSm}
+                          style={{
+                            background: isWriteOpen ? 'rgba(220,38,38,0.25)' : 'rgba(220,38,38,0.12)',
+                            border: `1px solid ${isWriteOpen ? 'var(--accent-crimson)' : 'rgba(220,38,38,0.4)'}`,
+                            color: 'var(--accent-crimson)',
+                          }}
+                        >
+                          {isWriteOpen ? '✕ Cancel' : 'Write'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -252,7 +342,7 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
                     />
                     <button
                       onClick={() => handleWrite(id)}
-                      disabled={isBusy || !writeContent[id]?.trim()}
+                      disabled={isSubmitting || !writeContent[id]?.trim()}
                       className={btnSm}
                       style={{
                         background: 'rgba(220,38,38,0.2)',
@@ -260,7 +350,7 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
                         color: 'var(--accent-crimson)',
                       }}
                     >
-                      {isBusy ? 'Writing…' : 'Submit'}
+                      {isSubmitting ? 'Writing…' : 'Submit'}
                     </button>
                   </div>
                 )}

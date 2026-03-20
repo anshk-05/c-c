@@ -1,10 +1,14 @@
 const BASE_URL = 'http://localhost:5044';
 
-export async function acquireRead(userId: number): Promise<{ content: string; message: string }> {
+export async function acquireRead(
+  userId: number,
+  signal?: AbortSignal,
+): Promise<{ content: string; message: string }> {
   const res = await fetch(`${BASE_URL}/api/file/acquireRead`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId }),
+    signal,
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.message || `Read failed (${res.status})`);
@@ -19,11 +23,15 @@ export async function releaseRead(userId: number): Promise<void> {
   });
 }
 
-export async function acquireWrite(userId: number): Promise<{ message: string }> {
+export async function acquireWrite(
+  userId: number,
+  signal?: AbortSignal,
+): Promise<{ message: string }> {
   const res = await fetch(`${BASE_URL}/api/file/acquireWrite`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId }),
+    signal,
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.message || `Acquire write failed (${res.status})`);
@@ -50,7 +58,11 @@ export async function writeFile(userId: number, content: string): Promise<void> 
   }
 }
 
-export async function getFileStatus(): Promise<{ readingUserIds: number[]; writingUserId: number | null; fileName: string }> {
+export async function getFileStatus(): Promise<{
+  readingUserIds: number[];
+  writingUserId: number | null;
+  fileName: string;
+}> {
   const res = await fetch(`${BASE_URL}/api/file/status`);
   if (!res.ok) throw new Error(`File status fetch failed (${res.status})`);
   return res.json();

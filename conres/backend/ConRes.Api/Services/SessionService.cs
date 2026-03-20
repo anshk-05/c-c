@@ -13,6 +13,7 @@ public class SessionService
     private readonly ConcurrentDictionary<int, UserSession> _userSessions = new();
     private readonly ConcurrentDictionary<int, SessionInfo> _activeSessions = new();
     private readonly SemaphoreSlim _loginSemaphore = new(MaxConcurrentUsers, MaxConcurrentUsers);
+    private FileService? _fileService;
 
     private readonly object _queueLock = new();
     private readonly Queue<int> _waitingQueue = new();
@@ -22,6 +23,8 @@ public class SessionService
     {
         _dbContextFactory = dbContextFactory;
     }
+
+    public void SetFileService(FileService fileService) => _fileService = fileService;
 
     public async Task<(bool Success, bool Queued, string Message, SessionInfo? Session)> LoginAsync(int userId, string username)
     {
@@ -161,6 +164,7 @@ public class SessionService
 
     private void CompleteSession(int userId)
     {
+        _fileService?.CancelQueuedRequests(userId);
         _activeSessions.TryRemove(userId, out _);
         RemoveWaitingUser(userId);
         _userSessions.TryRemove(userId, out _);
