@@ -11,11 +11,22 @@ interface Props {
 }
 
 export default function ScrollStatus({ status }: Props) {
-  const { readingUserIds, writingUserId, fileName, fileQueue } = status;
+  const {
+    readingUserIds,
+    writingUserId,
+    fileName,
+    fileQueue,
+    fileVersion,
+    lastUpdatedUtc,
+    lastUpdatedByUserId,
+  } = status;
   const hasReaders = readingUserIds.length > 0;
   const hasWriter = writingUserId !== null;
   // This is normalised to an array so the UI can handle null and empty queue states the same way.
   const queue = fileQueue ?? [];
+  const lastUpdatedLabel = lastUpdatedUtc
+    ? new Date(lastUpdatedUtc).toLocaleTimeString()
+    : 'not recorded';
 
   return (
     <div className="panel h-full">
@@ -25,6 +36,25 @@ export default function ScrollStatus({ status }: Props) {
       <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>
         {fileName || 'ProductSpecification.txt'} · Reader-Writer Lock
       </p>
+
+      <div
+        className="rounded-lg px-3 py-2 mb-4 text-xs"
+        style={{
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid var(--border-subtle)',
+          color: 'var(--text-secondary)',
+        }}
+      >
+        <div>
+          Version <strong style={{ color: 'var(--accent-amber)' }}>{fileVersion || 1}</strong>
+        </div>
+        <div>
+          Last update: <strong>{lastUpdatedLabel}</strong>
+          {lastUpdatedByUserId && (
+            <> by <strong className="capitalize">{userName(lastUpdatedByUserId)}</strong></>
+          )}
+        </div>
+      </div>
 
       {/* Lock state indicator */}
       <div

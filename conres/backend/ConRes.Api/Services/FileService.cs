@@ -15,6 +15,7 @@ public class FileService
     private readonly HashSet<int> _readingUserIds = new();
     private int _activeReaders = 0;
     private int? _writingUserId = null;
+    private int? _lastUpdatedByUserId = null;
 
     private readonly ISharedFileStore _sharedFileStore;
     private readonly IRealtimeEventPublisher _realtimeEvents;
@@ -277,6 +278,7 @@ public class FileService
             // This delay keeps the write lock visible in the UI long enough to demonstrate the critical section.
             await Task.Delay(5000);
             await _sharedFileStore.WriteContentAsync(content);
+            _lastUpdatedByUserId = userId;
             writeSucceeded = true;
             return (true, "File write successful.");
         }
@@ -383,11 +385,14 @@ public class FileService
 
     private void PublishFileUpdated(int userId)
     {
+        var metadata = _sharedFileStore.GetMetadata();
+
         _ = _realtimeEvents.PublishFileUpdatedAsync(new FileUpdatedResponse
         {
-            FileName = _sharedFileStore.FileName,
+            FileName = metadata.FileName,
+            FileVersion = metadata.Version,
             UserId = userId,
-            UpdatedAtUtc = DateTime.UtcNow
+            UpdatedAtUtc = metadata.LastUpdatedUtc
         });
     }
 
@@ -404,9 +409,14 @@ public class FileService
                 })
                 .ToList();
 
+            var metadata = _sharedFileStore.GetMetadata();
+
             return new FileAccessStatusResponse
             {
-                FileName = _sharedFileStore.FileName,
+                FileName = metadata.FileName,
+                FileVersion = metadata.Version,
+                LastUpdatedUtc = metadata.LastUpdatedUtc,
+                LastUpdatedByUserId = _lastUpdatedByUserId,
                 ReadingUserIds = _readingUserIds.OrderBy(id => id).ToList(),
                 WritingUserId = _writingUserId,
                 Queue = queue

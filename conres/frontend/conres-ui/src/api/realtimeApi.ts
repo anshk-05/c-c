@@ -11,6 +11,13 @@ export type RealtimeEventName =
   | 'FileUpdated'
   | 'SystemStatusChanged';
 
+export interface RealtimeFileUpdated {
+  fileName: string;
+  fileVersion: number;
+  userId: number;
+  updatedAtUtc: string;
+}
+
 export function createRealtimeConnection() {
   return new signalR.HubConnectionBuilder()
     .withUrl(`${BASE_URL}/hubs/distres`)

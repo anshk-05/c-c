@@ -87,6 +87,9 @@ public class SessionController : ControllerBase
             ReadingUserIds = fileStatus.ReadingUserIds,
             WritingUserId = fileStatus.WritingUserId,
             FileName = fileStatus.FileName,
+            FileVersion = fileStatus.FileVersion,
+            LastUpdatedUtc = fileStatus.LastUpdatedUtc,
+            LastUpdatedByUserId = fileStatus.LastUpdatedByUserId,
             FileQueue = fileStatus.Queue
         };
 

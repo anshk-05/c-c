@@ -12,5 +12,8 @@ export interface SystemStatus {
   readingUserIds: number[];
   writingUserId: number | null;
   fileName: string;
+  fileVersion: number;
+  lastUpdatedUtc: string;
+  lastUpdatedByUserId: number | null;
   fileQueue: QueuedRequest[];
 }

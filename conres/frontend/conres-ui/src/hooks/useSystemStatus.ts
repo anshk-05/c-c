@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { getSystemStatus } from '../api/sessionApi';
 import type { SystemStatus } from '../types';
 import { createRealtimeConnection } from '../api/realtimeApi';
-import type { RealtimeConnectionState, RealtimeEventName } from '../api/realtimeApi';
+import type { RealtimeConnectionState, RealtimeEventName, RealtimeFileUpdated } from '../api/realtimeApi';
 
 export function useSystemStatus() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<RealtimeConnectionState>('connecting');
   const [lastRealtimeEvent, setLastRealtimeEvent] = useState<RealtimeEventName | null>(null);
+  const [lastFileUpdate, setLastFileUpdate] = useState<RealtimeFileUpdated | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,18 +36,24 @@ export function useSystemStatus() {
       await fetchStatus();
     }
 
-    const realtimeEvents: RealtimeEventName[] = [
+    const statusRefreshEvents: RealtimeEventName[] = [
       'ServerConnected',
       'SessionStateChanged',
       'FileAccessChanged',
-      'FileUpdated',
       'SystemStatusChanged',
     ];
 
-    realtimeEvents.forEach((eventName) => {
+    statusRefreshEvents.forEach((eventName) => {
       connection.on(eventName, () => {
         void refreshFromRealtime(eventName);
       });
+    });
+
+    connection.on('FileUpdated', (payload: RealtimeFileUpdated) => {
+      if (!cancelled) {
+        setLastFileUpdate(payload);
+      }
+      void refreshFromRealtime('FileUpdated');
     });
 
     connection.onreconnecting(() => {
@@ -86,10 +93,11 @@ export function useSystemStatus() {
     return () => {
       cancelled = true;
       clearInterval(id);
-      realtimeEvents.forEach((eventName) => connection.off(eventName));
+      statusRefreshEvents.forEach((eventName) => connection.off(eventName));
+      connection.off('FileUpdated');
       void connection.stop();
     };
   }, []);
 
-  return { status, error, connectionState, lastRealtimeEvent };
+  return { status, error, connectionState, lastRealtimeEvent, lastFileUpdate };
 }

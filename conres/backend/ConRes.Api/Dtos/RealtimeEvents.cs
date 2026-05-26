@@ -20,6 +20,7 @@ public class FileAccessChangedResponse
 public class FileUpdatedResponse
 {
     public string FileName { get; set; } = string.Empty;
+    public long FileVersion { get; set; }
     public int UserId { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 }

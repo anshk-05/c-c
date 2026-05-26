@@ -9,7 +9,7 @@ import ScrollViewer from '../components/ScrollViewer';
 import ControlsPanel from '../components/ControlsPanel';
 
 export default function Dashboard() {
-  const { status, error, connectionState, lastRealtimeEvent } = useSystemStatus();
+  const { status, error, connectionState, lastRealtimeEvent, lastFileUpdate } = useSystemStatus();
   const [scrollContent, setScrollContent] = useState<string | null>(null);
   const [scrollError, setScrollError] = useState<string | null>(null);
 
@@ -104,6 +104,7 @@ export default function Dashboard() {
               <ScrollViewer
                 content={scrollContent}
                 error={scrollError}
+                lastFileUpdate={lastFileUpdate}
               />
             </div>
 

@@ -62,6 +62,9 @@ export async function getFileStatus(): Promise<{
   readingUserIds: number[];
   writingUserId: number | null;
   fileName: string;
+  fileVersion: number;
+  lastUpdatedUtc: string;
+  lastUpdatedByUserId: number | null;
 }> {
   const res = await fetch(`${BASE_URL}/api/file/status`);
   if (!res.ok) throw new Error(`File status fetch failed (${res.status})`);
