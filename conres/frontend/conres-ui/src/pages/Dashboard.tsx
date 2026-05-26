@@ -9,7 +9,7 @@ import ScrollViewer from '../components/ScrollViewer';
 import ControlsPanel from '../components/ControlsPanel';
 
 export default function Dashboard() {
-  const { status, error } = useSystemStatus();
+  const { status, error, connectionState, lastRealtimeEvent } = useSystemStatus();
   const [scrollContent, setScrollContent] = useState<string | null>(null);
   const [scrollError, setScrollError] = useState<string | null>(null);
 
@@ -22,6 +22,13 @@ export default function Dashboard() {
   function handleScrollError(msg: string) {
     setScrollError(msg);
   }
+
+  const realtimeColor =
+    connectionState === 'connected'
+      ? 'var(--accent-green)'
+      : connectionState === 'reconnecting' || connectionState === 'connecting'
+        ? 'var(--accent-amber)'
+        : 'var(--accent-crimson)';
 
   return (
     <div
@@ -45,6 +52,22 @@ export default function Dashboard() {
           >
             Jujutsu Command Center
           </h1>
+
+          <div
+            className="mt-2 inline-flex flex-wrap items-center justify-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
+            style={{
+              background: 'rgba(255,255,255,0.05)',
+              border: `1px solid ${realtimeColor}`,
+              color: realtimeColor,
+            }}
+          >
+            <span className="capitalize">Realtime {connectionState}</span>
+            {lastRealtimeEvent && (
+              <span style={{ color: 'var(--text-secondary)' }}>
+                last event: {lastRealtimeEvent}
+              </span>
+            )}
+          </div>
         
           {error && (
             <div

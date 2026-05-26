@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
 import { getSystemStatus } from '../api/sessionApi';
 import type { SystemStatus } from '../types';
+import { createRealtimeConnection } from '../api/realtimeApi';
+import type { RealtimeConnectionState, RealtimeEventName } from '../api/realtimeApi';
 
 export function useSystemStatus() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [connectionState, setConnectionState] = useState<RealtimeConnectionState>('connecting');
+  const [lastRealtimeEvent, setLastRealtimeEvent] = useState<RealtimeEventName | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    const connection = createRealtimeConnection();
 
     async function fetchStatus() {
       try {
@@ -23,14 +28,68 @@ export function useSystemStatus() {
       }
     }
 
-    // Polling every second keeps the shared state display feeling live.
+    async function refreshFromRealtime(eventName: RealtimeEventName) {
+      if (!cancelled) {
+        setLastRealtimeEvent(eventName);
+      }
+      await fetchStatus();
+    }
+
+    const realtimeEvents: RealtimeEventName[] = [
+      'ServerConnected',
+      'SessionStateChanged',
+      'FileAccessChanged',
+      'FileUpdated',
+      'SystemStatusChanged',
+    ];
+
+    realtimeEvents.forEach((eventName) => {
+      connection.on(eventName, () => {
+        void refreshFromRealtime(eventName);
+      });
+    });
+
+    connection.onreconnecting(() => {
+      if (!cancelled) {
+        setConnectionState('reconnecting');
+      }
+    });
+
+    connection.onreconnected(() => {
+      if (!cancelled) {
+        setConnectionState('connected');
+      }
+      void refreshFromRealtime('ServerConnected');
+    });
+
+    connection.onclose(() => {
+      if (!cancelled) {
+        setConnectionState('disconnected');
+      }
+    });
+
     fetchStatus();
-    const id = setInterval(fetchStatus, 1000);
+    void connection
+      .start()
+      .then(() => {
+        if (!cancelled) {
+          setConnectionState('connected');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setConnectionState('disconnected');
+        }
+      });
+
+    const id = setInterval(fetchStatus, 10000);
     return () => {
       cancelled = true;
       clearInterval(id);
+      realtimeEvents.forEach((eventName) => connection.off(eventName));
+      void connection.stop();
     };
   }, []);
 
-  return { status, error };
+  return { status, error, connectionState, lastRealtimeEvent };
 }
