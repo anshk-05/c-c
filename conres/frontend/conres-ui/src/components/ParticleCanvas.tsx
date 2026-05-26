@@ -14,6 +14,7 @@ function makeParticle(width: number, height: number, color: 'blue' | 'red'): Par
   const radius = 2 + Math.random() * 3;
   const speed = 0.3 + Math.random() * 0.7;
   return {
+    // Blue particles start from the left and red ones from the right to create a collision effect.
     x: color === 'blue' ? Math.random() * width : width - Math.random() * width,
     y: Math.random() * height,
     vx: color === 'blue' ? speed : -speed,
@@ -40,6 +41,7 @@ export default function ParticleCanvas() {
       if (!canvas) return;
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+      // Particles are rebuilt on resize so the effect keeps covering the full screen cleanly.
       particles = [
         ...Array.from({ length: 30 }, () => makeParticle(canvas.width, canvas.height, 'blue')),
         ...Array.from({ length: 30 }, () => makeParticle(canvas.width, canvas.height, 'red')),

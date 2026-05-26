@@ -24,14 +24,15 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
 
   const [pendingReadIds, setPendingReadIds] = useState<Set<number>>(new Set());
   const [pendingWriteIds, setPendingWriteIds] = useState<Set<number>>(new Set());
-  // Per-user AbortControllers so we can cancel in-flight requests
+  // One abort controller is stored per user so queued read/write requests can be cancelled individually.
   const abortControllersRef = useRef<Record<number, AbortController>>({});
 
-  // Users currently submitting file content (writeFile call)
+  // Active writes are tracked separately because holding the lock and submitting file content are different stages.
   const [submittingIds, setSubmittingIds] = useState<Set<number>>(new Set());
 
   function setResult(id: number, result: { ok: boolean; msg: string }) {
     setOpResult((prev) => ({ ...prev, [id]: result }));
+    // These status messages are cleared automatically so the card does not stay cluttered.
     setTimeout(
       () => setOpResult((prev) => { const n = { ...prev }; delete n[id]; return n; }),
       4000,
@@ -45,6 +46,7 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
 
   async function handleRead(id: number) {
     if (pendingReadIds.has(id)) {
+      // Clicking again while queued acts as a cancel action for that pending read request.
       abortControllersRef.current[id]?.abort();
       return;
     }
@@ -79,6 +81,7 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
 
   async function handleToggleWrite(id: number) {
     if (formOpenId === id) {
+      // Closing the editor also releases the write lock so a hidden lock is not left behind.
       try { await releaseWrite(id); } catch { /* ignore */ }
       setFormOpenId(null);
       return;
@@ -125,6 +128,7 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
   }
 
   function cardState(id: number): 'writer' | 'reader' | 'pendingRead' | 'pendingWrite' | 'idle' {
+    // Visual state comes from backend status first, then falls back to local pending request state.
     if (id === writingUserId) return 'writer';
     if (readingUserIds.includes(id)) return 'reader';
     if (pendingReadIds.has(id)) return 'pendingRead';
@@ -175,7 +179,7 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
 
             const cardGlow = isWriter ? 'pulse-crimson' : isReader ? 'glow-blue' : '';
 
-            // Status line text
+            // Queue positions are shown when available so lock behaviour is easier to follow.
             const statusText = isWriter
               ? '✍ writing…'
               : isReader

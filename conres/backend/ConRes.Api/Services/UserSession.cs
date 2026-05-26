@@ -70,6 +70,7 @@ public sealed class UserSession
         {
             if (_executionTask is null)
             {
+                // The session workflow starts once, and every caller then awaits the same result task.
                 _executionTask = Task.Run(RunAsync);
             }
         }
@@ -97,6 +98,7 @@ public sealed class UserSession
         {
             if (!_loginSemaphore.Wait(0))
             {
+                // No permit means the user is valid, but must wait for one of the 4 active slots to open.
                 SetState(UserSessionState.Waiting);
                 _markWaiting(_user.Id);
 
@@ -113,6 +115,7 @@ public sealed class UserSession
             _holdsPermit = true;
             _removeWaiting(_user.Id);
 
+            // Once a permit is acquired, the user moves from queued to active.
             var sessionInfo = CreateSessionInfo();
             SetState(UserSessionState.Active);
             _markActive(sessionInfo);
@@ -150,6 +153,7 @@ public sealed class UserSession
         if (_holdsPermit)
         {
             _holdsPermit = false;
+            // Releasing the semaphore here ensures the other users can log on.
             _loginSemaphore.Release();
         }
 

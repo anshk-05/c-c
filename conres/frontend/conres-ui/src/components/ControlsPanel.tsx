@@ -13,6 +13,7 @@ export default function ControlsPanel() {
   const [logoutBusy, setLogoutBusy] = useState(false);
 
   async function handleLogin() {
+    // The username is derived from the selected ID so it stays aligned with the seeded backend users.
     const username = USERNAMES[selectedUser - 1];
     setLoginBusy(true);
     setLoginResult(null);
@@ -63,6 +64,7 @@ export default function ControlsPanel() {
             return (
               <button
                 key={id}
+                // User selection is kept separate from login state so different users can be tested quickly.
                 onClick={() => setSelectedUser(id)}
                 className="px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-all"
                 style={{

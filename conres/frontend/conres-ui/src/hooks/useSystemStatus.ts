@@ -23,6 +23,7 @@ export function useSystemStatus() {
       }
     }
 
+    // Polling every second keeps the shared state display feeling live.
     fetchStatus();
     const id = setInterval(fetchStatus, 1000);
     return () => {

@@ -14,6 +14,7 @@ export default function ScrollStatus({ status }: Props) {
   const { readingUserIds, writingUserId, fileName, fileQueue } = status;
   const hasReaders = readingUserIds.length > 0;
   const hasWriter = writingUserId !== null;
+  // This is normalised to an array so the UI can handle null and empty queue states the same way.
   const queue = fileQueue ?? [];
 
   return (

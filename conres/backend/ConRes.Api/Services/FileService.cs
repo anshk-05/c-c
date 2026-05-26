@@ -4,6 +4,7 @@ namespace ConRes.Api.Services;
 
 public class FileService
 {
+    // Each wait node stores who is waiting, what access they want, and which task should be resumed later.
     private record WaitNode(int UserId, bool IsWrite, TaskCompletionSource<bool> Tcs);
 
     private readonly object _trackingLock = new();
@@ -46,6 +47,7 @@ public class FileService
 
 
             bool writerWaiting = _queue.Any(n => n.IsWrite);
+            // Readers can proceed together only when there is no active writer and no writer already queued.
             if (_writingUserId == null && !writerWaiting)
             {
                 _activeReaders++;
@@ -60,7 +62,7 @@ public class FileService
 
         if (tcs != null)
         {
-
+            // If the request is cancelled while queued, it is removed before promotion happens.
             var reg = ct.Register(() =>
             {
                 lock (_trackingLock)
@@ -136,6 +138,7 @@ public class FileService
             if (_writingUserId == userId)
                 return (false, "You are already holding the write lock.");
 
+            // A writer can skip the queue only when nobody is using or already waiting for the file.
             if (_activeReaders == 0 && _writingUserId == null && _queue.Count == 0)
             {
                 _writingUserId = userId;
@@ -211,6 +214,7 @@ public class FileService
 
         try
         {
+            // This delay keeps the write lock visible in the UI long enough to demonstrate the critical section.
             await Task.Delay(5000);
             await File.WriteAllTextAsync(_filePath, content);
             return (true, "File write successful.");
@@ -233,6 +237,7 @@ public class FileService
 
             if (!IsUserActive(head.UserId))
             {
+                // Inactive users are skipped here so they do not block the lock queue.
                 _queue.RemoveFirst();
                 head.Tcs.TrySetResult(false);
                 continue;
@@ -250,6 +255,7 @@ public class FileService
             }
             else
             {
+                // Consecutive readers can proceed together as long as no writer currently holds the lock.
                 if (_writingUserId == null)
                 {
                     _queue.RemoveFirst();

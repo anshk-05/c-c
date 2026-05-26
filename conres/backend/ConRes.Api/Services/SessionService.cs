@@ -52,6 +52,7 @@ public class SessionService
 
         if (_userSessions.TryGetValue(user.Id, out var existingSession))
         {
+            // This prevents the same user from creating duplicate active or queued sessions.
             return existingSession.State switch
             {
                 UserSessionState.Active => (false, false, "User is already logged in.", null),
@@ -121,6 +122,7 @@ public class SessionService
     {
         lock (_queueLock)
         {
+            // The HashSet blocks duplicates while the Queue preserves FIFO ordering.
             if (_waitingUserIds.Add(userId))
             {
                 _waitingQueue.Enqueue(userId);
@@ -164,6 +166,7 @@ public class SessionService
 
     private void CompleteSession(int userId)
     {
+        // Any queued file requests are cleared here so stale entries do not remain after logout.
         _fileService?.CancelQueuedRequests(userId);
         _activeSessions.TryRemove(userId, out _);
         RemoveWaitingUser(userId);

@@ -14,6 +14,7 @@ export default function Dashboard() {
   const [scrollError, setScrollError] = useState<string | null>(null);
 
   function handleScrollRead(content: string) {
+    // Any previous error is cleared here so the viewer can show the latest successful read cleanly.
     setScrollError(null);
     setScrollContent(content);
   }
@@ -57,10 +58,10 @@ export default function Dashboard() {
 
         {status ? (
           <>
-            {/* Status panel — full width */}
+            {/* Status panel full width */}
             <StatusPanel status={status} />
 
-            {/* Active + Waiting — 2/3 + 1/3 */}
+            {/* Active + Waiting 2/3 + 1/3 */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div className="md:col-span-2">
                 <ActiveUsers
@@ -74,7 +75,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Scroll status + viewer — 1/2 + 1/2 */}
+            {/* Scroll status + viewer 1/2 + 1/2 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <ScrollStatus status={status} />
               <ScrollViewer
@@ -83,7 +84,7 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* Session controls — full width */}
+            {/* Session controls full width */}
             <ControlsPanel />
           </>
         ) : (
