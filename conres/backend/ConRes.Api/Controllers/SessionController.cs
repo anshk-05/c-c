@@ -20,7 +20,7 @@ public class SessionController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var result = await _sessionService.LoginAsync(request.UserId, request.Username);
+        var result = await _sessionService.LoginAsync(request.UserId, request.Username, request.Password);
 
         if (result.Success)
         {

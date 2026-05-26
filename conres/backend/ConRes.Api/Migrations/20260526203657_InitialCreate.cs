@@ -19,6 +19,7 @@ namespace ConRes.Api.Migrations
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
                     Username = table.Column<string>(type: "TEXT", nullable: false),
+                    Password = table.Column<string>(type: "TEXT", nullable: false),
                     DisplayName = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
@@ -28,15 +29,15 @@ namespace ConRes.Api.Migrations
 
             migrationBuilder.InsertData(
                 table: "Users",
-                columns: new[] { "Id", "DisplayName", "Username" },
+                columns: new[] { "Id", "DisplayName", "Password", "Username" },
                 values: new object[,]
                 {
-                    { 1, "Aarav Patel", "aarav" },
-                    { 2, "Isha Sharma", "isha" },
-                    { 3, "Dev Kumar", "dev" },
-                    { 4, "Maya Singh", "maya" },
-                    { 5, "Rohan Mehta", "rohan" },
-                    { 6, "Anika Nair", "anika" }
+                    { 1, "Satoru Gojo", "gojopass", "gojo" },
+                    { 2, "Ryomen Sukuna", "sukunapass", "sukuna" },
+                    { 3, "Yuji Itadori", "itadoripass", "itadori" },
+                    { 4, "Nobara Kugisaki", "nobarapass", "nobara" },
+                    { 5, "Aoi Todo", "todopass", "todo" },
+                    { 6, "Toji Fushiguro", "tojipass", "toji" }
                 });
         }
 

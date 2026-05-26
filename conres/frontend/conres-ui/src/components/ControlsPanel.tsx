@@ -7,6 +7,7 @@ type ActionResult = { ok: boolean; msg: string } | null;
 
 export default function ControlsPanel() {
   const [selectedUser, setSelectedUser] = useState<number>(1);
+  const [password, setPassword] = useState('');
   const [loginResult, setLoginResult] = useState<ActionResult>(null);
   const [logoutResult, setLogoutResult] = useState<ActionResult>(null);
   const [loginBusy, setLoginBusy] = useState(false);
@@ -18,7 +19,7 @@ export default function ControlsPanel() {
     setLoginBusy(true);
     setLoginResult(null);
     try {
-      const res = await login(selectedUser, username);
+      const res = await login(selectedUser, username, password);
       if (res.queued) {
         setLoginResult({ ok: true, msg: `${username} queued — barrier full` });
       } else {
@@ -79,6 +80,24 @@ export default function ControlsPanel() {
             );
           })}
         </div>
+      </div>
+
+      <div className="mb-4">
+        <label className="block text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+          Password
+        </label>
+        <input
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          className="w-full max-w-xs px-3 py-2 rounded-lg text-sm outline-none transition-all"
+          style={{
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid var(--border-subtle)',
+            color: 'var(--text-primary)',
+          }}
+          autoComplete="current-password"
+        />
       </div>
 
       {/* Login / Logout */}

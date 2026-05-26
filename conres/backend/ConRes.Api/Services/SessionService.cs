@@ -25,7 +25,10 @@ public class SessionService
 
     public void SetFileService(FileService fileService) => _fileService = fileService;
 
-    public async Task<(bool Success, bool Queued, string Message, SessionInfo? Session)> LoginAsync(int userId, string username)
+    public async Task<(bool Success, bool Queued, string Message, SessionInfo? Session)> LoginAsync(
+        int userId,
+        string username,
+        string password)
     {
         if (userId <= 0)
         {
@@ -37,13 +40,19 @@ public class SessionService
             return (false, false, "Username is required.", null);
         }
 
-        var normalizedUsername = username.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            return (false, false, "Password is required.", null);
+        }
 
-        var user = await _userRepository.GetByIdAndUsernameAsync(userId, normalizedUsername);
+        var normalizedUsername = username.Trim().ToLowerInvariant();
+        var passwordValue = password.Trim();
+
+        var user = await _userRepository.GetByCredentialsAsync(userId, normalizedUsername, passwordValue);
 
         if (user is null)
         {
-            return (false, false, "User ID and username do not match any registered user.", null);
+            return (false, false, "User credentials do not match any registered user.", null);
         }
 
         if (_userSessions.TryGetValue(user.Id, out var existingSession))

@@ -4,6 +4,6 @@ namespace ConRes.Api.Data;
 
 public interface IUserRepository
 {
-    Task<User?> GetByIdAndUsernameAsync(int userId, string normalizedUsername);
+    Task<User?> GetByCredentialsAsync(int userId, string normalizedUsername, string password);
     Task<IReadOnlyList<User>> GetAllAsync();
 }

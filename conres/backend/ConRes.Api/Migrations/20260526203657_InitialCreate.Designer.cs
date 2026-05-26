@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ConRes.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260315103950_InitialCreate")]
+    [Migration("20260526203657_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -29,6 +29,10 @@ namespace ConRes.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Password")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -41,38 +45,44 @@ namespace ConRes.Api.Migrations
                         new
                         {
                             Id = 1,
-                            DisplayName = "Aarav Patel",
-                            Username = "aarav"
+                            DisplayName = "Satoru Gojo",
+                            Password = "gojopass",
+                            Username = "gojo"
                         },
                         new
                         {
                             Id = 2,
-                            DisplayName = "Isha Sharma",
-                            Username = "isha"
+                            DisplayName = "Ryomen Sukuna",
+                            Password = "sukunapass",
+                            Username = "sukuna"
                         },
                         new
                         {
                             Id = 3,
-                            DisplayName = "Dev Kumar",
-                            Username = "dev"
+                            DisplayName = "Yuji Itadori",
+                            Password = "itadoripass",
+                            Username = "itadori"
                         },
                         new
                         {
                             Id = 4,
-                            DisplayName = "Maya Singh",
-                            Username = "maya"
+                            DisplayName = "Nobara Kugisaki",
+                            Password = "nobarapass",
+                            Username = "nobara"
                         },
                         new
                         {
                             Id = 5,
-                            DisplayName = "Rohan Mehta",
-                            Username = "rohan"
+                            DisplayName = "Aoi Todo",
+                            Password = "todopass",
+                            Username = "todo"
                         },
                         new
                         {
                             Id = 6,
-                            DisplayName = "Anika Nair",
-                            Username = "anika"
+                            DisplayName = "Toji Fushiguro",
+                            Password = "tojipass",
+                            Username = "toji"
                         });
                 });
 #pragma warning restore 612, 618
