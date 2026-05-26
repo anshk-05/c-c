@@ -1,6 +1,5 @@
 using ConRes.Api.Data;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace ConRes.Api.Controllers;
 
@@ -8,19 +7,17 @@ namespace ConRes.Api.Controllers;
 [Route("api/[controller]")]
 public class UsersController : ControllerBase
 {
-    private readonly AppDbContext _dbContext;
+    private readonly IUserRepository _userRepository;
 
-    public UsersController(AppDbContext dbContext)
+    public UsersController(IUserRepository userRepository)
     {
-        _dbContext = dbContext;
+        _userRepository = userRepository;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetUsers()
     {
-        var users = await _dbContext.Users
-            .OrderBy(u => u.Id)
-            .ToListAsync();
+        var users = await _userRepository.GetAllAsync();
 
         return Ok(users);
     }

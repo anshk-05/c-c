@@ -1,4 +1,5 @@
 using ConRes.Api.Dtos;
+using ConRes.Api.Resources;
 
 namespace ConRes.Api.Services;
 
@@ -15,14 +16,13 @@ public class FileService
     private int _activeReaders = 0;
     private int? _writingUserId = null;
 
-    private readonly string _filePath;
-    private readonly string _fileName = "ProductSpecification.txt";
+    private readonly ISharedFileStore _sharedFileStore;
     private readonly SessionService _sessionService;
 
-    public FileService(SessionService sessionService, IWebHostEnvironment environment)
+    public FileService(SessionService sessionService, ISharedFileStore sharedFileStore)
     {
         _sessionService = sessionService;
-        _filePath = Path.Combine(environment.ContentRootPath, "SharedFiles", _fileName);
+        _sharedFileStore = sharedFileStore;
     }
 
     public bool IsUserActive(int userId)
@@ -94,7 +94,7 @@ public class FileService
 
         try
         {
-            var content = await File.ReadAllTextAsync(_filePath, ct);
+            var content = await _sharedFileStore.ReadContentAsync(ct);
             return (true, "File read successful.", content);
         }
         catch (OperationCanceledException)
@@ -216,7 +216,7 @@ public class FileService
         {
             // This delay keeps the write lock visible in the UI long enough to demonstrate the critical section.
             await Task.Delay(5000);
-            await File.WriteAllTextAsync(_filePath, content);
+            await _sharedFileStore.WriteContentAsync(content);
             return (true, "File write successful.");
         }
         finally
@@ -309,7 +309,7 @@ public class FileService
 
             return new FileAccessStatusResponse
             {
-                FileName = _fileName,
+                FileName = _sharedFileStore.FileName,
                 ReadingUserIds = _readingUserIds.OrderBy(id => id).ToList(),
                 WritingUserId = _writingUserId,
                 Queue = queue

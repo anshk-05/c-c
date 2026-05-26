@@ -1,5 +1,6 @@
 using System.Runtime.Serialization;
 using ConRes.Api.Data;
+using ConRes.Api.Resources;
 using ConRes.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,6 +11,8 @@ builder.Services.AddControllers();
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddSingleton<IUserRepository, UserRepository>();
+builder.Services.AddSingleton<ISharedFileStore, SharedFileStore>();
 builder.Services.AddSingleton<SessionService>();
 builder.Services.AddSingleton<FileService>();
 
@@ -34,7 +37,8 @@ app.Services.GetRequiredService<SessionService>()
 
 using (var scope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+    using var dbContext = dbContextFactory.CreateDbContext();
     dbContext.Database.Migrate();
 }
 

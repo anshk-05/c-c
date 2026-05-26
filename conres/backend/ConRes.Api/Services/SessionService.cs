@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using ConRes.Api.Data;
 using ConRes.Api.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace ConRes.Api.Services;
 
@@ -9,7 +8,7 @@ public class SessionService
 {
     private const int MaxConcurrentUsers = 4;
 
-    private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
+    private readonly IUserRepository _userRepository;
     private readonly ConcurrentDictionary<int, UserSession> _userSessions = new();
     private readonly ConcurrentDictionary<int, SessionInfo> _activeSessions = new();
     private readonly SemaphoreSlim _loginSemaphore = new(MaxConcurrentUsers, MaxConcurrentUsers);
@@ -19,9 +18,9 @@ public class SessionService
     private readonly Queue<int> _waitingQueue = new();
     private readonly HashSet<int> _waitingUserIds = new();
 
-    public SessionService(IDbContextFactory<AppDbContext> dbContextFactory)
+    public SessionService(IUserRepository userRepository)
     {
-        _dbContextFactory = dbContextFactory;
+        _userRepository = userRepository;
     }
 
     public void SetFileService(FileService fileService) => _fileService = fileService;
@@ -40,10 +39,7 @@ public class SessionService
 
         var normalizedUsername = username.Trim().ToLowerInvariant();
 
-        await using var dbContext = await _dbContextFactory.CreateDbContextAsync();
-
-        var user = await dbContext.Users
-            .FirstOrDefaultAsync(u => u.Id == userId && u.Username.ToLower() == normalizedUsername);
+        var user = await _userRepository.GetByIdAndUsernameAsync(userId, normalizedUsername);
 
         if (user is null)
         {
