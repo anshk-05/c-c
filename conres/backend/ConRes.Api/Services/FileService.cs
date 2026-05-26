@@ -17,12 +17,17 @@ public class FileService
     private int? _writingUserId = null;
 
     private readonly ISharedFileStore _sharedFileStore;
+    private readonly IRealtimeEventPublisher _realtimeEvents;
     private readonly SessionService _sessionService;
 
-    public FileService(SessionService sessionService, ISharedFileStore sharedFileStore)
+    public FileService(
+        SessionService sessionService,
+        ISharedFileStore sharedFileStore,
+        IRealtimeEventPublisher realtimeEvents)
     {
         _sessionService = sessionService;
         _sharedFileStore = sharedFileStore;
+        _realtimeEvents = realtimeEvents;
     }
 
     public bool IsUserActive(int userId)
@@ -39,6 +44,7 @@ public class FileService
 
         LinkedListNode<WaitNode>? listNode = null;
         TaskCompletionSource<bool>? tcs = null;
+        var publishReason = string.Empty;
 
         lock (_trackingLock)
         {
@@ -52,24 +58,39 @@ public class FileService
             {
                 _activeReaders++;
                 _readingUserIds.Add(userId);
+                publishReason = "read-lock-acquired";
             }
             else
             {
                 tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 listNode = _queue.AddLast(new WaitNode(userId, IsWrite: false, tcs));
+                publishReason = "read-request-queued";
             }
         }
+
+        PublishFileAccessChanged(publishReason);
 
         if (tcs != null)
         {
             // If the request is cancelled while queued, it is removed before promotion happens.
             var reg = ct.Register(() =>
             {
+                var removed = false;
+
                 lock (_trackingLock)
                 {
                     if (listNode!.List != null)
+                    {
                         _queue.Remove(listNode);
+                        removed = true;
+                    }
                 }
+
+                if (removed)
+                {
+                    PublishFileAccessChanged("read-request-cancelled");
+                }
+
                 tcs.TrySetCanceled(ct);
             });
 
@@ -90,6 +111,8 @@ public class FileService
             lock (_trackingLock) { acquired = _readingUserIds.Contains(userId); }
             if (!acquired)
                 return (false, "Read request was cancelled — session ended.", null);
+
+            PublishFileAccessChanged("read-lock-acquired");
         }
 
         try
@@ -111,6 +134,8 @@ public class FileService
 
     public Task<(bool Success, string Message)> ReleaseReadAsync(int userId)
     {
+        var released = false;
+
         lock (_trackingLock)
         {
             if (!_readingUserIds.Remove(userId))
@@ -119,6 +144,13 @@ public class FileService
             _activeReaders--;
             if (_activeReaders == 0)
                 TryPromoteNext();
+
+            released = true;
+        }
+
+        if (released)
+        {
+            PublishFileAccessChanged("read-lock-released");
         }
 
         return Task.FromResult((true, "Read lock released."));
@@ -132,6 +164,7 @@ public class FileService
 
         LinkedListNode<WaitNode>? listNode = null;
         TaskCompletionSource<bool>? tcs = null;
+        var publishReason = string.Empty;
 
         lock (_trackingLock)
         {
@@ -142,23 +175,38 @@ public class FileService
             if (_activeReaders == 0 && _writingUserId == null && _queue.Count == 0)
             {
                 _writingUserId = userId;
+                publishReason = "write-lock-acquired";
             }
             else
             {
                 tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 listNode = _queue.AddLast(new WaitNode(userId, IsWrite: true, tcs));
+                publishReason = "write-request-queued";
             }
         }
+
+        PublishFileAccessChanged(publishReason);
 
         if (tcs != null)
         {
             var reg = ct.Register(() =>
             {
+                var removed = false;
+
                 lock (_trackingLock)
                 {
                     if (listNode!.List != null)
+                    {
                         _queue.Remove(listNode);
+                        removed = true;
+                    }
                 }
+
+                if (removed)
+                {
+                    PublishFileAccessChanged("write-request-cancelled");
+                }
+
                 tcs.TrySetCanceled(ct);
             });
 
@@ -179,6 +227,8 @@ public class FileService
             lock (_trackingLock) { acquired = _writingUserId == userId; }
             if (!acquired)
                 return (false, "Write request was cancelled — session ended.");
+
+            PublishFileAccessChanged("write-lock-acquired");
         }
 
         return (true, "Write lock acquired.");
@@ -186,6 +236,8 @@ public class FileService
 
     public Task<(bool Success, string Message)> ReleaseWriteLockAsync(int userId)
     {
+        var released = false;
+
         lock (_trackingLock)
         {
             if (_writingUserId != userId)
@@ -193,6 +245,12 @@ public class FileService
 
             _writingUserId = null;
             TryPromoteNext();
+            released = true;
+        }
+
+        if (released)
+        {
+            PublishFileAccessChanged("write-lock-released");
         }
 
         return Task.FromResult((true, "Write lock released."));
@@ -212,11 +270,14 @@ public class FileService
                 return (false, "Write lock not held. Acquire the write lock first.");
         }
 
+        var writeSucceeded = false;
+
         try
         {
             // This delay keeps the write lock visible in the UI long enough to demonstrate the critical section.
             await Task.Delay(5000);
             await _sharedFileStore.WriteContentAsync(content);
+            writeSucceeded = true;
             return (true, "File write successful.");
         }
         finally
@@ -225,6 +286,13 @@ public class FileService
             {
                 _writingUserId = null;
                 TryPromoteNext();
+            }
+
+            PublishFileAccessChanged("write-lock-released");
+
+            if (writeSucceeded)
+            {
+                PublishFileUpdated(userId);
             }
         }
     }
@@ -274,6 +342,7 @@ public class FileService
     public void CancelQueuedRequests(int userId)
     {
         var toCancel = new List<TaskCompletionSource<bool>>();
+        var removedAny = false;
 
         lock (_trackingLock)
         {
@@ -285,6 +354,7 @@ public class FileService
                 {
                     toCancel.Add(node.Value.Tcs);
                     _queue.Remove(node);
+                    removedAny = true;
                 }
                 node = next;
             }
@@ -292,6 +362,33 @@ public class FileService
 
         foreach (var tcs in toCancel)
             tcs.TrySetCanceled();
+
+        if (removedAny)
+        {
+            PublishFileAccessChanged("queued-file-requests-cancelled");
+        }
+    }
+
+    private void PublishFileAccessChanged(string reason)
+    {
+        _ = _realtimeEvents.PublishFileAccessChangedAsync(new FileAccessChangedResponse
+        {
+            Reason = reason,
+            OccurredAtUtc = DateTime.UtcNow,
+            Status = GetFileAccessStatus()
+        });
+
+        _ = _realtimeEvents.PublishSystemStatusChangedAsync(reason);
+    }
+
+    private void PublishFileUpdated(int userId)
+    {
+        _ = _realtimeEvents.PublishFileUpdatedAsync(new FileUpdatedResponse
+        {
+            FileName = _sharedFileStore.FileName,
+            UserId = userId,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
     }
 
     public FileAccessStatusResponse GetFileAccessStatus()

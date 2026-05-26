@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using ConRes.Api.Data;
+using ConRes.Api.Dtos;
 using ConRes.Api.Models;
 
 namespace ConRes.Api.Services;
@@ -9,6 +10,7 @@ public class SessionService
     private const int MaxConcurrentUsers = 4;
 
     private readonly IUserRepository _userRepository;
+    private readonly IRealtimeEventPublisher _realtimeEvents;
     private readonly ConcurrentDictionary<int, UserSession> _userSessions = new();
     private readonly ConcurrentDictionary<int, SessionInfo> _activeSessions = new();
     private readonly SemaphoreSlim _loginSemaphore = new(MaxConcurrentUsers, MaxConcurrentUsers);
@@ -18,9 +20,10 @@ public class SessionService
     private readonly Queue<int> _waitingQueue = new();
     private readonly HashSet<int> _waitingUserIds = new();
 
-    public SessionService(IUserRepository userRepository)
+    public SessionService(IUserRepository userRepository, IRealtimeEventPublisher realtimeEvents)
     {
         _userRepository = userRepository;
+        _realtimeEvents = realtimeEvents;
     }
 
     public void SetFileService(FileService fileService) => _fileService = fileService;
@@ -133,6 +136,8 @@ public class SessionService
                 _waitingQueue.Enqueue(userId);
             }
         }
+
+        PublishSessionStateChanged("session-waiting");
     }
 
     private void RemoveWaitingUser(int userId)
@@ -167,6 +172,7 @@ public class SessionService
     {
         RemoveWaitingUser(session.UserId);
         _activeSessions[session.UserId] = session;
+        PublishSessionStateChanged("session-active");
     }
 
     private void CompleteSession(int userId)
@@ -176,5 +182,23 @@ public class SessionService
         _activeSessions.TryRemove(userId, out _);
         RemoveWaitingUser(userId);
         _userSessions.TryRemove(userId, out _);
+        PublishSessionStateChanged("session-ended");
+    }
+
+    private void PublishSessionStateChanged(string reason)
+    {
+        _ = _realtimeEvents.PublishSessionStateChangedAsync(new SessionStateChangedResponse
+        {
+            Reason = reason,
+            OccurredAtUtc = DateTime.UtcNow,
+            ActiveUserIds = GetActiveSessions()
+                .Select(s => s.UserId)
+                .ToList(),
+            WaitingUserIds = GetWaitingUserIds().ToList(),
+            MaxConcurrentUsers = GetMaxConcurrentUsers(),
+            AvailableSlots = GetAvailableSlots()
+        });
+
+        _ = _realtimeEvents.PublishSystemStatusChangedAsync(reason);
     }
 }

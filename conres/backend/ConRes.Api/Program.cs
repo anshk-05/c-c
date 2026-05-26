@@ -1,5 +1,5 @@
-using System.Runtime.Serialization;
 using ConRes.Api.Data;
+using ConRes.Api.Hubs;
 using ConRes.Api.Resources;
 using ConRes.Api.Services;
 using Microsoft.EntityFrameworkCore;
@@ -7,12 +7,14 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddSingleton<IUserRepository, UserRepository>();
 builder.Services.AddSingleton<ISharedFileStore, SharedFileStore>();
+builder.Services.AddSingleton<IRealtimeEventPublisher, SignalRRealtimeEventPublisher>();
 builder.Services.AddSingleton<SessionService>();
 builder.Services.AddSingleton<FileService>();
 
@@ -24,9 +26,10 @@ builder.Services.AddCors(options =>
     options.AddPolicy("ReactPolicy", policy =>
     {
         policy
-            .AllowAnyOrigin()
+            .SetIsOriginAllowed(_ => true)
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -53,5 +56,6 @@ app.UseHttpsRedirection();
 app.UseCors("ReactPolicy");
 
 app.MapControllers();
+app.MapHub<DistResHub>("/hubs/distres");
 
 app.Run();
