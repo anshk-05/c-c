@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { login, logout } from '../api/sessionApi';
+import { useEffect, useState } from 'react';
+import { login, logout, sendHeartbeat } from '../api/sessionApi';
 
 const USERNAMES = ['gojo', 'sukuna', 'itadori', 'nobara', 'todo', 'toji'];
 
@@ -12,6 +12,39 @@ export default function ControlsPanel() {
   const [logoutResult, setLogoutResult] = useState<ActionResult>(null);
   const [loginBusy, setLoginBusy] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const [heartbeatUserIds, setHeartbeatUserIds] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (heartbeatUserIds.size === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function pulse() {
+      await Promise.all([...heartbeatUserIds].map(async (userId) => {
+        try {
+          await sendHeartbeat(userId);
+        } catch (err) {
+          if (!cancelled && err instanceof Error && err.message.includes('Session not found')) {
+            setHeartbeatUserIds((prev) => {
+              const next = new Set(prev);
+              next.delete(userId);
+              return next;
+            });
+          }
+        }
+      }));
+    }
+
+    void pulse();
+    const id = window.setInterval(pulse, 15000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [heartbeatUserIds]);
 
   async function handleLogin() {
     // The username is derived from the selected ID so it stays aligned with the seeded backend users.
@@ -20,6 +53,7 @@ export default function ControlsPanel() {
     setLoginResult(null);
     try {
       const res = await login(selectedUser, username, password);
+      setHeartbeatUserIds((prev) => new Set(prev).add(selectedUser));
       if (res.queued) {
         setLoginResult({ ok: true, msg: `${username} queued — barrier full` });
       } else {
@@ -37,6 +71,11 @@ export default function ControlsPanel() {
     setLogoutResult(null);
     try {
       await logout(selectedUser);
+      setHeartbeatUserIds((prev) => {
+        const next = new Set(prev);
+        next.delete(selectedUser);
+        return next;
+      });
       setLogoutResult({ ok: true, msg: `${USERNAMES[selectedUser - 1]} left the barrier` });
     } catch (e) {
       setLogoutResult({ ok: false, msg: e instanceof Error ? e.message : 'Logout failed' });

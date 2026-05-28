@@ -17,6 +17,7 @@ builder.Services.AddSingleton<ISharedFileStore, SharedFileStore>();
 builder.Services.AddSingleton<IRealtimeEventPublisher, SignalRRealtimeEventPublisher>();
 builder.Services.AddSingleton<SessionService>();
 builder.Services.AddSingleton<FileService>();
+builder.Services.AddHostedService<StaleSessionCleanupService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

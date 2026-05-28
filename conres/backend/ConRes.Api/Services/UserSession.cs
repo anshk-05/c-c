@@ -32,6 +32,7 @@ public sealed class UserSession
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _logoutSignal =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly CancellationTokenSource _waitingCancellation = new();
 
     private UserSessionState _state = UserSessionState.Created;
     private bool _holdsPermit;
@@ -82,12 +83,20 @@ public sealed class UserSession
     {
         lock (_stateLock)
         {
-            if (_state != UserSessionState.Active)
+            if (_state == UserSessionState.LoggedOut)
             {
                 return false;
             }
 
-            _logoutSignal.TrySetResult();
+            if (_state == UserSessionState.Active)
+            {
+                _logoutSignal.TrySetResult();
+            }
+            else
+            {
+                _waitingCancellation.Cancel();
+            }
+
             return true;
         }
     }
@@ -109,7 +118,12 @@ public sealed class UserSession
                     Message = "No slot available. User added to waiting queue."
                 });
 
-                await _loginSemaphore.WaitAsync();
+                await _loginSemaphore.WaitAsync(_waitingCancellation.Token);
+            }
+
+            if (_waitingCancellation.IsCancellationRequested)
+            {
+                return;
             }
 
             _holdsPermit = true;

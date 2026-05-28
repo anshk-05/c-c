@@ -64,6 +64,25 @@ public class SessionController : ControllerBase
         });
     }
 
+    [HttpPost("heartbeat")]
+    public IActionResult Heartbeat([FromBody] SessionHeartbeatRequest request)
+    {
+        var success = _sessionService.RecordHeartbeat(request.UserId);
+
+        if (!success)
+        {
+            return NotFound(new
+            {
+                message = "Session not found."
+            });
+        }
+
+        return Ok(new
+        {
+            message = "Heartbeat recorded."
+        });
+    }
+
     [HttpGet("active")]
     public IActionResult GetActiveSessions()
     {

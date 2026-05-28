@@ -8,11 +8,13 @@ namespace ConRes.Api.Services;
 public class SessionService
 {
     private const int MaxConcurrentUsers = 4;
+    private static readonly TimeSpan StaleSessionThreshold = TimeSpan.FromSeconds(45);
 
     private readonly IUserRepository _userRepository;
     private readonly IRealtimeEventPublisher _realtimeEvents;
     private readonly ConcurrentDictionary<int, UserSession> _userSessions = new();
     private readonly ConcurrentDictionary<int, SessionInfo> _activeSessions = new();
+    private readonly ConcurrentDictionary<int, DateTime> _lastSeenUtc = new();
     private readonly SemaphoreSlim _loginSemaphore = new(MaxConcurrentUsers, MaxConcurrentUsers);
     private FileService? _fileService;
 
@@ -82,11 +84,14 @@ public class SessionService
             return (false, false, "Could not create session.", null);
         }
 
+        RecordHeartbeat(user.Id);
+
         var startResult = await userSession.StartAsync();
 
         if (!startResult.Success && !startResult.Queued)
         {
             _userSessions.TryRemove(user.Id, out _);
+            _lastSeenUtc.TryRemove(user.Id, out _);
         }
 
         return (startResult.Success, startResult.Queued, startResult.Message, startResult.Session);
@@ -98,6 +103,44 @@ public class SessionService
             return false;
 
         return userSession.RequestLogout();
+    }
+
+    public bool RecordHeartbeat(int userId)
+    {
+        if (!_userSessions.ContainsKey(userId))
+        {
+            return false;
+        }
+
+        _lastSeenUtc[userId] = DateTime.UtcNow;
+        return true;
+    }
+
+    public int CleanupStaleSessions()
+    {
+        var cutoffUtc = DateTime.UtcNow - StaleSessionThreshold;
+        var staleUserIds = _lastSeenUtc
+            .Where(entry => entry.Value < cutoffUtc)
+            .Select(entry => entry.Key)
+            .ToList();
+
+        var cleaned = 0;
+
+        foreach (var userId in staleUserIds)
+        {
+            if (!_userSessions.TryGetValue(userId, out var userSession))
+            {
+                _lastSeenUtc.TryRemove(userId, out _);
+                continue;
+            }
+
+            if (userSession.RequestLogout())
+            {
+                cleaned++;
+            }
+        }
+
+        return cleaned;
     }
 
     public IReadOnlyCollection<SessionInfo> GetActiveSessions()
@@ -182,6 +225,7 @@ public class SessionService
         _activeSessions.TryRemove(userId, out _);
         RemoveWaitingUser(userId);
         _userSessions.TryRemove(userId, out _);
+        _lastSeenUtc.TryRemove(userId, out _);
         PublishSessionStateChanged("session-ended");
     }
 
