@@ -20,7 +20,7 @@ export default function ScrollViewer({ content, error, lastFileUpdate }: Props) 
   return (
     <div className="panel parchment h-full flex flex-col">
       <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--accent-amber)' }}>
-        Scroll Contents
+        Shared File Viewer
       </h2>
 
       {lastFileUpdate && (
@@ -32,7 +32,7 @@ export default function ScrollViewer({ content, error, lastFileUpdate }: Props) 
             color: 'var(--accent-green)',
           }}
         >
-          Update propagated from <strong className="capitalize">{userName(lastFileUpdate.userId)}</strong>
+          Update propagated through SignalR from <strong className="capitalize">{userName(lastFileUpdate.userId)}</strong>
           {' '}· version {lastFileUpdate.fileVersion}
           {updateTime && <> · {updateTime}</>}
         </div>
@@ -55,7 +55,7 @@ export default function ScrollViewer({ content, error, lastFileUpdate }: Props) 
           <span style={{ color: 'rgba(245,222,179,0.85)' }}>{content}</span>
         ) : (
           <span style={{ color: 'var(--text-secondary)', opacity: 0.5 }}>
-            Use the controls below to read the scroll.
+            Use the demo controls to read the server-hosted shared file.
           </span>
         )}
       </div>

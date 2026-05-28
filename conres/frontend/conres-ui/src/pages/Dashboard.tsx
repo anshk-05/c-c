@@ -40,7 +40,6 @@ export default function Dashboard() {
       <ParticleCanvas />
 
       <div className="relative p-4 md:p-6 max-w-7xl mx-auto" style={{ zIndex: 1 }}>
-        {/* Header */}
         <header className="mb-6 text-center">
           <h1
             className="text-3xl md:text-4xl font-bold tracking-tight mb-1"
@@ -50,8 +49,34 @@ export default function Dashboard() {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Jujutsu Command Center
+            DistRes Server Monitor
           </h1>
+
+          <p className="mx-auto max-w-3xl text-sm md:text-base" style={{ color: 'var(--text-secondary)' }}>
+            Central server node for client sessions, shared resource locks, and publish-subscribe events.
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold">
+            {[
+              'Server Node',
+              'HTTP API Coordination',
+              'SignalR Pub-Sub Hub',
+              'SQLite User Store',
+              'Shared File: ProductSpecification.txt',
+            ].map((label) => (
+              <span
+                key={label}
+                className="rounded-full px-3 py-1"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
 
           <div
             className="mt-2 inline-flex flex-wrap items-center justify-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
@@ -61,7 +86,7 @@ export default function Dashboard() {
               color: realtimeColor,
             }}
           >
-            <span className="capitalize">Realtime {connectionState}</span>
+            <span className="capitalize">Pub-sub channel {connectionState}</span>
             {lastRealtimeEvent && (
               <span style={{ color: 'var(--text-secondary)' }}>
                 last event: {lastRealtimeEvent}
@@ -98,7 +123,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Scroll status + viewer 1/2 + 1/2 */}
+            {/* Shared resource status + viewer 1/2 + 1/2 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <ScrollStatus status={status} />
               <ScrollViewer
@@ -115,7 +140,7 @@ export default function Dashboard() {
           <div className="text-center py-20" style={{ color: 'var(--text-secondary)' }}>
             {error
               ? 'Connect to the backend to begin.'
-              : '⏳ Connecting to backend…'}
+              : 'Connecting to backend...'}
           </div>
         )}
       </div>

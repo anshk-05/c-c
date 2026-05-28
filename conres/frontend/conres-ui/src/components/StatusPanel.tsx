@@ -14,10 +14,10 @@ export default function StatusPanel({ status }: Props) {
     <div className="panel mb-4">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-semibold tracking-wide" style={{ color: 'var(--accent-purple)' }}>
-          ⚡ Barrier Capacity
+          Client Session Capacity
         </h2>
         <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          {usedSlots} / {maxConcurrentUsers} sorcerers active
+          {usedSlots} / {maxConcurrentUsers} client nodes active
         </span>
       </div>
 
@@ -40,9 +40,9 @@ export default function StatusPanel({ status }: Props) {
                 border: `1px solid ${occupied ? 'var(--accent-purple)' : 'var(--border-subtle)'}`,
                 color: occupied ? 'var(--accent-blue)' : 'var(--text-secondary)',
                 boxShadow: occupied ? '0 0 8px var(--glow-purple)' : 'none',
-              }}
-            >
-              {occupied ? '◈ SLOT' : '○ OPEN'}
+            }}
+          >
+              {occupied ? 'CLIENT' : 'OPEN'}
             </div>
           );
         })}
@@ -57,13 +57,13 @@ export default function StatusPanel({ status }: Props) {
             color: 'var(--accent-amber)',
           }}
         >
-          ⚠ BARRIER FULL — Incoming sorcerers are queued
+          SESSION CAPACITY FULL, incoming client nodes are queued
         </div>
       )}
 
       <div className="mt-3 flex gap-6 text-xs" style={{ color: 'var(--text-secondary)' }}>
-        <span>Active: <strong style={{ color: 'var(--accent-blue)' }}>{activeUserIds.length}</strong></span>
-        <span>Waiting: <strong style={{ color: 'var(--accent-amber)' }}>{status.waitingUserIds.length}</strong></span>
+        <span>Active clients: <strong style={{ color: 'var(--accent-blue)' }}>{activeUserIds.length}</strong></span>
+        <span>Queued clients: <strong style={{ color: 'var(--accent-amber)' }}>{status.waitingUserIds.length}</strong></span>
         <span>Available slots: <strong style={{ color: 'var(--accent-green)' }}>{availableSlots}</strong></span>
         <span>Readers: <strong style={{ color: 'var(--accent-blue)' }}>{status.readingUserIds.length}</strong></span>
         <span>Writer: <strong style={{ color: status.writingUserId ? 'var(--accent-crimson)' : 'var(--text-secondary)' }}>

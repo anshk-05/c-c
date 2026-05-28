@@ -58,7 +58,7 @@ body {
   animation: pulse-crimson 1.5s ease-in-out infinite;
 }
 
-/* Barrier full warning pulse */
+/* Session capacity warning pulse */
 @keyframes pulse-amber {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
@@ -75,7 +75,7 @@ body {
   padding: 1.25rem;
 }
 
-/* Scroll / parchment texture overlay */
+/* Shared file viewer texture overlay */
 .parchment {
   background: linear-gradient(
     135deg,

@@ -31,10 +31,10 @@ export default function ScrollStatus({ status }: Props) {
   return (
     <div className="panel h-full">
       <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--accent-purple)' }}>
-        Scroll Access
+        Shared Resource State
       </h2>
       <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>
-        {fileName || 'ProductSpecification.txt'} · Reader-Writer Lock
+        {fileName || 'ProductSpecification.txt'} reader-writer lock managed by the server
       </p>
 
       <div
@@ -70,10 +70,10 @@ export default function ScrollStatus({ status }: Props) {
         }}
       >
         {hasWriter
-          ? 'WRITE LOCK — Exclusive access'
+          ? 'WRITE LOCK exclusive server-granted access'
           : hasReaders
-          ? 'READ LOCK — Shared access'
-          : 'UNLOCKED — No active access'}
+          ? 'READ LOCK shared concurrent access'
+          : 'UNLOCKED no active access'}
       </div>
 
       {/* Readers */}
@@ -126,7 +126,7 @@ export default function ScrollStatus({ status }: Props) {
       {/* Pending queue */}
       <div>
         <div className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-          Pending Queue ({queue.length})
+          Pending Lock Queue ({queue.length})
         </div>
         {queue.length === 0 ? (
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No pending requests.</p>
@@ -149,7 +149,7 @@ export default function ScrollStatus({ status }: Props) {
                   #{req.position}
                 </span>
                 <span className="capitalize font-semibold">{userName(req.userId)}</span>
-                <span className="opacity-60">— {req.isWrite ? '✍ Write' : '📖 Read'}</span>
+                <span className="opacity-60">- {req.isWrite ? 'Write' : 'Read'}</span>
               </div>
             ))}
           </div>

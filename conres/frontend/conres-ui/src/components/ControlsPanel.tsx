@@ -55,9 +55,9 @@ export default function ControlsPanel() {
       const res = await login(selectedUser, username, password);
       setHeartbeatUserIds((prev) => new Set(prev).add(selectedUser));
       if (res.queued) {
-        setLoginResult({ ok: true, msg: `${username} queued — barrier full` });
+        setLoginResult({ ok: true, msg: `${username} queued, server capacity full` });
       } else {
-        setLoginResult({ ok: true, msg: `${username} entered the barrier` });
+        setLoginResult({ ok: true, msg: `${username} connected as a client node` });
       }
     } catch (e) {
       setLoginResult({ ok: false, msg: e instanceof Error ? e.message : 'Login failed' });
@@ -76,7 +76,7 @@ export default function ControlsPanel() {
         next.delete(selectedUser);
         return next;
       });
-      setLogoutResult({ ok: true, msg: `${USERNAMES[selectedUser - 1]} left the barrier` });
+      setLogoutResult({ ok: true, msg: `${USERNAMES[selectedUser - 1]} disconnected from the server` });
     } catch (e) {
       setLogoutResult({ ok: false, msg: e instanceof Error ? e.message : 'Logout failed' });
     } finally {
@@ -90,13 +90,13 @@ export default function ControlsPanel() {
   return (
     <div className="panel">
       <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-        Session Controls
+        Demo Session Controls
       </h2>
 
       {/* User selector */}
       <div className="mb-4">
         <label className="block text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-          Select Sorcerer
+          Select Client Identity
         </label>
         <div className="flex flex-wrap gap-2">
           {USERNAMES.map((name, i) => {
@@ -147,7 +147,7 @@ export default function ControlsPanel() {
           className={btnBase}
           style={{ background: 'rgba(59,130,246,0.2)', border: '1px solid var(--accent-blue)', color: 'var(--accent-blue)' }}
         >
-          {loginBusy ? '⏳ Entering…' : '→ Enter Barrier'}
+          {loginBusy ? 'Connecting...' : 'Connect Client'}
         </button>
         <button
           onClick={handleLogout}
@@ -155,7 +155,7 @@ export default function ControlsPanel() {
           className={btnBase}
           style={{ background: 'rgba(220,38,38,0.15)', border: '1px solid var(--accent-crimson)', color: 'var(--accent-crimson)' }}
         >
-          {logoutBusy ? '⏳ Leaving…' : '← Leave Barrier'}
+          {logoutBusy ? 'Disconnecting...' : 'Disconnect Client'}
         </button>
         {loginResult && (
           <span className="text-xs" style={{ color: loginResult.ok ? 'var(--accent-green)' : 'var(--accent-crimson)' }}>
@@ -170,7 +170,7 @@ export default function ControlsPanel() {
       </div>
 
       <p className="mt-3 text-xs" style={{ color: 'var(--text-secondary)', opacity: 0.5 }}>
-        Max 4 sorcerers active simultaneously · Extras are queued · Read/Write controls appear on each active sorcerer's card above
+        Max 4 active client nodes. Extra clients are queued by the server. Read/write controls above demonstrate server-side coordination.
       </p>
     </div>
   );

@@ -16,10 +16,10 @@ export default function WaitingUsers({ status }: Props) {
   return (
     <div className="panel h-full">
       <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--accent-amber)' }}>
-        Queued Sorcerers
+        Queued Client Nodes
       </h2>
       {waitingUserIds.length === 0 ? (
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Queue is empty.</p>
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Server queue is empty.</p>
       ) : (
         <div className="flex flex-col gap-2">
           {waitingUserIds.map((id, idx) => (
@@ -46,7 +46,7 @@ export default function WaitingUsers({ status }: Props) {
                     {userName(id)}
                   </div>
                   <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    ID #{id} · position {idx + 1}
+                    Client ID #{id} · position {idx + 1}
                   </div>
                 </div>
               </div>
@@ -57,7 +57,7 @@ export default function WaitingUsers({ status }: Props) {
                   color: 'var(--accent-amber)',
                 }}
               >
-                ⏸ WAITING
+                WAITING
               </div>
             </div>
           ))}
@@ -65,7 +65,7 @@ export default function WaitingUsers({ status }: Props) {
       )}
       {waitingUserIds.length > 0 && (
         <p className="mt-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
-          Will enter when a slot opens (FIFO queue)
+          Client nodes are admitted when a server session slot opens (FIFO queue).
         </p>
       )}
     </div>

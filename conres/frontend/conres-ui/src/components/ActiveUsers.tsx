@@ -58,7 +58,7 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
     try {
       const res = await acquireRead(id, controller.signal);
       onScrollRead(res.content);
-      setResult(id, { ok: true, msg: 'Reading…' });
+      setResult(id, { ok: true, msg: 'Reading shared file' });
     } catch (e) {
       if (e instanceof Error && e.name === 'AbortError') {
         setResult(id, { ok: false, msg: 'Read request cancelled' });
@@ -141,11 +141,11 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
   return (
     <div className="panel h-full">
       <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--accent-blue)' }}>
-        Active Sorcerers
+        Active Client Nodes
       </h2>
       {activeUserIds.length === 0 ? (
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          No sorcerers are active. Login one below.
+          No client nodes are connected. Use the demo controls below to create one.
         </p>
       ) : (
         <div className="flex flex-col gap-2">
@@ -181,17 +181,17 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
 
             // Queue positions are shown when available so lock behaviour is easier to follow.
             const statusText = isWriter
-              ? '✍ writing…'
+              ? 'writing...'
               : isReader
-              ? 'reading…'
+              ? 'reading...'
               : isPendingRead
               ? readQueuePos
-                ? `⌛ queued for read — #${readQueuePos}`
-                : '⌛ waiting for read lock…'
+                ? `queued for read #${readQueuePos}`
+                : 'waiting for read lock'
               : isPendingWrite
               ? writeQueuePos
-                ? `⌛ queued for write — #${writeQueuePos}`
-                : '⌛ waiting for write lock…'
+                ? `queued for write #${writeQueuePos}`
+                : 'waiting for write lock'
               : 'idle';
 
             return (
@@ -260,7 +260,7 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
                             color: 'var(--accent-amber)',
                           }}
                         >
-                          ■ Stop Reading
+                          Stop Reading
                         </button>
                       ) : isPendingRead ? (
                         <button
@@ -272,7 +272,7 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
                             color: 'var(--accent-amber)',
                           }}
                         >
-                          ⌛ Waiting… ✕
+                          Waiting... Cancel
                         </button>
                       ) : (
                         <button
@@ -300,7 +300,7 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
                             color: 'var(--accent-amber)',
                           }}
                         >
-                          ⌛ Waiting… ✕
+                          Waiting... Cancel
                         </button>
                       ) : (
                         <button
@@ -313,7 +313,7 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
                             color: 'var(--accent-crimson)',
                           }}
                         >
-                          {isWriteOpen ? '✕ Cancel' : 'Write'}
+                          {isWriteOpen ? 'Cancel' : 'Write'}
                         </button>
                       )}
                     </div>
@@ -334,7 +334,7 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
                       type="text"
                       value={writeContent[id] ?? ''}
                       onChange={(e) => setWriteContent((prev) => ({ ...prev, [id]: e.target.value }))}
-                      placeholder="New scroll content…"
+                      placeholder="New shared file content..."
                       autoFocus
                       className="flex-1 px-3 py-1.5 rounded-md text-sm outline-none"
                       style={{
@@ -354,7 +354,7 @@ export default function ActiveUsers({ status, onScrollRead }: Props) {
                         color: 'var(--accent-crimson)',
                       }}
                     >
-                      {isSubmitting ? 'Writing…' : 'Submit'}
+                      {isSubmitting ? 'Writing...' : 'Submit'}
                     </button>
                   </div>
                 )}
