@@ -1,5 +1,11 @@
 import type { SystemStatus } from '../types';
 
+const USERNAMES = ['gojo', 'sukuna', 'itadori', 'nobara', 'todo', 'toji'];
+
+function userName(id: number) {
+  return USERNAMES[id - 1] ?? `User ${id}`;
+}
+
 interface Props {
   status: SystemStatus;
 }
@@ -28,13 +34,14 @@ export default function StatusPanel({ status }: Props) {
         />
       </div>
 
-      <div className="flex gap-4 text-sm">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
         {Array.from({ length: maxConcurrentUsers }).map((_, i) => {
-          const occupied = i < usedSlots;
+          const activeUserId = activeUserIds[i];
+          const occupied = activeUserId !== undefined;
           return (
             <div
               key={i}
-              className="flex-1 rounded-lg py-2 text-center font-mono text-xs"
+              className="flex-1 rounded-lg px-2 py-2 text-center text-xs"
               style={{
                 background: occupied ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.04)',
                 border: `1px solid ${occupied ? 'var(--accent-purple)' : 'var(--border-subtle)'}`,
@@ -42,7 +49,14 @@ export default function StatusPanel({ status }: Props) {
                 boxShadow: occupied ? '0 0 8px var(--glow-purple)' : 'none',
             }}
           >
-              {occupied ? 'CLIENT' : 'OPEN'}
+              {occupied ? (
+                <>
+                  <div className="font-semibold capitalize">{userName(activeUserId)}</div>
+                  <div className="font-mono opacity-60">#{activeUserId}</div>
+                </>
+              ) : (
+                <span className="font-mono">OPEN</span>
+              )}
             </div>
           );
         })}

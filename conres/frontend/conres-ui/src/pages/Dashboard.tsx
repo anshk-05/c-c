@@ -1,27 +1,38 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSystemStatus } from '../hooks/useSystemStatus';
 import ParticleCanvas from '../components/ParticleCanvas';
 import StatusPanel from '../components/StatusPanel';
-import ActiveUsers from '../components/ActiveUsers';
+import ClientNodeMonitor from '../components/ClientNodeMonitor';
 import WaitingUsers from '../components/WaitingUsers';
 import ScrollStatus from '../components/ScrollStatus';
 import ScrollViewer from '../components/ScrollViewer';
-import ControlsPanel from '../components/ControlsPanel';
+import { getSharedFileContent } from '../api/fileApi';
 
 export default function Dashboard() {
   const { status, error, connectionState, lastRealtimeEvent, lastFileUpdate } = useSystemStatus();
   const [scrollContent, setScrollContent] = useState<string | null>(null);
   const [scrollError, setScrollError] = useState<string | null>(null);
 
-  function handleScrollRead(content: string) {
-    // Any previous error is cleared here so the viewer can show the latest successful read cleanly.
-    setScrollError(null);
-    setScrollContent(content);
-  }
+  const refreshSharedFile = useCallback(async () => {
+    try {
+      const snapshot = await getSharedFileContent();
+      setScrollContent(snapshot.content);
+      setScrollError(null);
+    } catch (err) {
+      setScrollError(err instanceof Error ? err.message : 'Failed to load shared file');
+    }
+  }, []);
 
-  function handleScrollError(msg: string) {
-    setScrollError(msg);
-  }
+  useEffect(() => {
+    void refreshSharedFile();
+    const id = window.setInterval(refreshSharedFile, 10000);
+
+    return () => window.clearInterval(id);
+  }, [refreshSharedFile]);
+
+  useEffect(() => {
+    void refreshSharedFile();
+  }, [lastFileUpdate, status?.fileVersion, refreshSharedFile]);
 
   const realtimeColor =
     connectionState === 'connected'
@@ -93,6 +104,18 @@ export default function Dashboard() {
               </span>
             )}
           </div>
+
+          <a
+            href="/client"
+            className="mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold"
+            style={{
+              background: 'rgba(16,185,129,0.12)',
+              border: '1px solid rgba(16,185,129,0.35)',
+              color: 'var(--accent-green)',
+            }}
+          >
+            Open Client Node
+          </a>
         
           {error && (
             <div
@@ -112,11 +135,7 @@ export default function Dashboard() {
             {/* Active + Waiting 2/3 + 1/3 */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div className="md:col-span-2">
-                <ActiveUsers
-                  status={status}
-                  onScrollRead={handleScrollRead}
-                  onScrollError={handleScrollError}
-                />
+                <ClientNodeMonitor status={status} />
               </div>
               <div>
                 <WaitingUsers status={status} />
@@ -132,9 +151,6 @@ export default function Dashboard() {
                 lastFileUpdate={lastFileUpdate}
               />
             </div>
-
-            {/* Session controls full width */}
-            <ControlsPanel />
           </>
         ) : (
           <div className="text-center py-20" style={{ color: 'var(--text-secondary)' }}>

@@ -1,4 +1,5 @@
 using ConRes.Api.Dtos;
+using ConRes.Api.Resources;
 using ConRes.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,10 +10,12 @@ namespace ConRes.Api.Controllers;
 public class FileController : ControllerBase
 {
     private readonly FileService _fileService;
+    private readonly ISharedFileStore _sharedFileStore;
 
-    public FileController(FileService fileService)
+    public FileController(FileService fileService, ISharedFileStore sharedFileStore)
     {
         _fileService = fileService;
+        _sharedFileStore = sharedFileStore;
     }
 
     [HttpPost("acquireRead")]
@@ -79,5 +82,20 @@ public class FileController : ControllerBase
     {
         var status = _fileService.GetFileAccessStatus();
         return Ok(status);
+    }
+
+    [HttpGet("content")]
+    public async Task<IActionResult> GetFileContent(CancellationToken cancellationToken)
+    {
+        var metadata = _sharedFileStore.GetMetadata();
+        var content = await _sharedFileStore.ReadContentAsync(cancellationToken);
+
+        return Ok(new
+        {
+            metadata.FileName,
+            FileVersion = metadata.Version,
+            metadata.LastUpdatedUtc,
+            content
+        });
     }
 }

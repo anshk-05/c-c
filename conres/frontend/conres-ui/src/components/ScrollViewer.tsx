@@ -55,7 +55,7 @@ export default function ScrollViewer({ content, error, lastFileUpdate }: Props) 
           <span style={{ color: 'rgba(245,222,179,0.85)' }}>{content}</span>
         ) : (
           <span style={{ color: 'var(--text-secondary)', opacity: 0.5 }}>
-            Use the demo controls to read the server-hosted shared file.
+            Waiting for the latest server-hosted shared file snapshot.
           </span>
         )}
       </div>

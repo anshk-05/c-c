@@ -60,3 +60,12 @@ export async function getFileStatus(): Promise<{
 }> {
   return requestJson(`${BASE_URL}/api/file/status`);
 }
+
+export async function getSharedFileContent(): Promise<{
+  fileName: string;
+  fileVersion: number;
+  lastUpdatedUtc: string;
+  content: string;
+}> {
+  return requestJson(`${BASE_URL}/api/file/content`);
+}
