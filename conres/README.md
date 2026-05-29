@@ -20,13 +20,6 @@ The system is split into a React client and an ASP.NET Core server.
 - Server API: authentication, session coordination, lock coordination, shared file storage, and SignalR events.
 - Data layer: SQLite user database and a protected text file.
 
-### Component Diagram
-
-![UML component diagram](docs/Figure1_Component_Diagram.png)
-
-### Deployment Diagram
-
-![UML deployment diagram](docs/Figure2_Deployment_Diagram.png)
 
 ## Main Design Decisions
 
