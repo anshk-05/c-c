@@ -6,6 +6,7 @@ public class SharedFileStore : ISharedFileStore
 {
     private readonly string _filePath;
     private readonly object _metadataLock = new();
+    // Version is displayed in the UI so successful writes are easy to prove.
     private long _version = 1;
     private DateTime _lastUpdatedUtc;
 

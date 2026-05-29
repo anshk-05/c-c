@@ -9,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddSignalR();
 
+// Core server services for users, sessions, file locking, and realtime events.
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -57,6 +58,7 @@ app.UseHttpsRedirection();
 app.UseCors("ReactPolicy");
 
 app.MapControllers();
+// SignalR hub used as the publish-subscribe channel.
 app.MapHub<DistResHub>("/hubs/distres");
 
 app.Run();

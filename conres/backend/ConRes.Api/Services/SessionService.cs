@@ -7,6 +7,7 @@ namespace ConRes.Api.Services;
 
 public class SessionService
 {
+    // The semaphore enforces the coursework limit on concurrent client nodes.
     private const int MaxConcurrentUsers = 4;
     private static readonly TimeSpan StaleSessionThreshold = TimeSpan.FromSeconds(45);
 
@@ -18,6 +19,7 @@ public class SessionService
     private readonly SemaphoreSlim _loginSemaphore = new(MaxConcurrentUsers, MaxConcurrentUsers);
     private FileService? _fileService;
 
+    // Queue is kept separate from the semaphore so the UI can display waiting users in order.
     private readonly object _queueLock = new();
     private readonly Queue<int> _waitingQueue = new();
     private readonly HashSet<int> _waitingUserIds = new();
@@ -231,6 +233,7 @@ public class SessionService
 
     private void PublishSessionStateChanged(string reason)
     {
+        // Broadcast a compact snapshot so every monitor/client sees the same session state.
         _ = _realtimeEvents.PublishSessionStateChangedAsync(new SessionStateChangedResponse
         {
             Reason = reason,

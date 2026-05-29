@@ -6,6 +6,7 @@ namespace ConRes.Api.Services;
 
 public class SignalRRealtimeEventPublisher : IRealtimeEventPublisher
 {
+    // This class is the publish side of the SignalR pub-sub mechanism.
     private readonly IHubContext<DistResHub> _hubContext;
     private readonly ILogger<SignalRRealtimeEventPublisher> _logger;
 
@@ -46,6 +47,7 @@ public class SignalRRealtimeEventPublisher : IRealtimeEventPublisher
     {
         try
         {
+            // Every connected monitor/client receives the same event.
             await _hubContext.Clients.All.SendAsync(eventName, payload);
         }
         catch (Exception ex)

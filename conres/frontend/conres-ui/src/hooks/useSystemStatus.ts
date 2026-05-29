@@ -89,6 +89,7 @@ export function useSystemStatus() {
     }
 
     async function refreshFromRealtime(eventName: RealtimeEventName, payload?: RealtimePayload) {
+      // Events prove something changed; the fresh HTTP snapshot keeps the UI authoritative.
       recordRealtimeEvent(eventName, payload);
       await fetchStatus();
     }

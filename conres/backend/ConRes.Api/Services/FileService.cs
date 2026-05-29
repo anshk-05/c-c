@@ -8,8 +8,10 @@ public class FileService
     // Each wait node stores who is waiting, what access they want, and which task should be resumed later.
     private record WaitNode(int UserId, bool IsWrite, TaskCompletionSource<bool> Tcs);
 
+    // All reader, writer, and queue state is protected by this lock.
     private readonly object _trackingLock = new();
 
+    // FIFO queue for file access requests that cannot run immediately.
     private readonly LinkedList<WaitNode> _queue = new();
 
     private readonly HashSet<int> _readingUserIds = new();
@@ -36,7 +38,6 @@ public class FileService
         return _sessionService.GetActiveSessions().Any(s => s.UserId == userId);
     }
 
- 
     public async Task<(bool Success, string Message, string? Content)> AcquireReadAsync(
         int userId, CancellationToken ct = default)
     {
@@ -301,6 +302,7 @@ public class FileService
 
     private void TryPromoteNext()
     {
+        // Promote the next valid queued request when the current lock is released.
         while (_queue.First != null)
         {
             var head = _queue.First.Value;
