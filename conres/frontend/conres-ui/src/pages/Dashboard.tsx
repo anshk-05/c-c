@@ -6,10 +6,11 @@ import ClientNodeMonitor from '../components/ClientNodeMonitor';
 import WaitingUsers from '../components/WaitingUsers';
 import ScrollStatus from '../components/ScrollStatus';
 import ScrollViewer from '../components/ScrollViewer';
+import RealtimeEventLog from '../components/RealtimeEventLog';
 import { getSharedFileContent } from '../api/fileApi';
 
 export default function Dashboard() {
-  const { status, error, connectionState, lastRealtimeEvent, lastFileUpdate } = useSystemStatus();
+  const { status, error, connectionState, lastRealtimeEvent, lastFileUpdate, eventLog } = useSystemStatus();
   const [scrollContent, setScrollContent] = useState<string | null>(null);
   const [scrollError, setScrollError] = useState<string | null>(null);
 
@@ -150,6 +151,10 @@ export default function Dashboard() {
                 error={scrollError}
                 lastFileUpdate={lastFileUpdate}
               />
+            </div>
+
+            <div className="mb-4">
+              <RealtimeEventLog events={eventLog} />
             </div>
           </>
         ) : (

@@ -4,15 +4,59 @@ import type { SystemStatus } from '../types';
 import { createRealtimeConnection } from '../api/realtimeApi';
 import type { RealtimeConnectionState, RealtimeEventName, RealtimeFileUpdated } from '../api/realtimeApi';
 
+export interface RealtimeEventLogEntry {
+  id: number;
+  eventName: RealtimeEventName;
+  occurredAt: string;
+  detail: string;
+}
+
+interface RealtimePayload {
+  reason?: string;
+  occurredAtUtc?: string;
+  connectedAtUtc?: string;
+  fileName?: string;
+  fileVersion?: number;
+  userId?: number;
+  updatedAtUtc?: string;
+  status?: {
+    fileVersion?: number;
+    writingUserId?: number | null;
+    readingUserIds?: number[];
+    queue?: unknown[];
+  };
+}
+
+function describeRealtimeEvent(eventName: RealtimeEventName, payload?: RealtimePayload) {
+  if (eventName === 'ServerConnected') {
+    return 'client subscribed to coordination broker';
+  }
+
+  if (eventName === 'FileUpdated') {
+    return `${payload?.fileName ?? 'shared file'} v${payload?.fileVersion ?? '?'} updated by user #${payload?.userId ?? '?'}`;
+  }
+
+  if (eventName === 'FileAccessChanged') {
+    const writer = payload?.status?.writingUserId;
+    const readers = payload?.status?.readingUserIds?.length ?? 0;
+    const queued = payload?.status?.queue?.length ?? 0;
+    return `${payload?.reason ?? 'file access changed'}; readers=${readers}; writer=${writer ?? 'none'}; queued=${queued}`;
+  }
+
+  return payload?.reason ?? 'status refresh requested';
+}
+
 export function useSystemStatus() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<RealtimeConnectionState>('connecting');
   const [lastRealtimeEvent, setLastRealtimeEvent] = useState<RealtimeEventName | null>(null);
   const [lastFileUpdate, setLastFileUpdate] = useState<RealtimeFileUpdated | null>(null);
+  const [eventLog, setEventLog] = useState<RealtimeEventLogEntry[]>([]);
 
   useEffect(() => {
     let cancelled = false;
+    let nextEventId = 1;
     const connection = createRealtimeConnection();
 
     async function fetchStatus() {
@@ -29,10 +73,23 @@ export function useSystemStatus() {
       }
     }
 
-    async function refreshFromRealtime(eventName: RealtimeEventName) {
+    function recordRealtimeEvent(eventName: RealtimeEventName, payload?: RealtimePayload) {
       if (!cancelled) {
         setLastRealtimeEvent(eventName);
+        setEventLog((current) => [
+          {
+            id: nextEventId++,
+            eventName,
+            occurredAt: payload?.occurredAtUtc ?? payload?.updatedAtUtc ?? payload?.connectedAtUtc ?? new Date().toISOString(),
+            detail: describeRealtimeEvent(eventName, payload),
+          },
+          ...current,
+        ].slice(0, 12));
       }
+    }
+
+    async function refreshFromRealtime(eventName: RealtimeEventName, payload?: RealtimePayload) {
+      recordRealtimeEvent(eventName, payload);
       await fetchStatus();
     }
 
@@ -44,8 +101,8 @@ export function useSystemStatus() {
     ];
 
     statusRefreshEvents.forEach((eventName) => {
-      connection.on(eventName, () => {
-        void refreshFromRealtime(eventName);
+      connection.on(eventName, (payload?: RealtimePayload) => {
+        void refreshFromRealtime(eventName, payload);
       });
     });
 
@@ -53,7 +110,7 @@ export function useSystemStatus() {
       if (!cancelled) {
         setLastFileUpdate(payload);
       }
-      void refreshFromRealtime('FileUpdated');
+      void refreshFromRealtime('FileUpdated', payload);
     });
 
     connection.onreconnecting(() => {
@@ -99,5 +156,5 @@ export function useSystemStatus() {
     };
   }, []);
 
-  return { status, error, connectionState, lastRealtimeEvent, lastFileUpdate };
+  return { status, error, connectionState, lastRealtimeEvent, lastFileUpdate, eventLog };
 }
