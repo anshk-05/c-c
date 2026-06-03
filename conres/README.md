@@ -94,17 +94,6 @@ http://localhost:5173
 | 5 | todo | todopass |
 | 6 | toji | tojipass |
 
-## Suggested Demo Flow
-
-1. Start the backend and frontend.
-2. Open the Server Monitor.
-3. Open two or more Client Node windows.
-4. Log in as different users and watch the Server Monitor update.
-5. Log in more than 4 users to show the waiting queue.
-6. Use one client to read the shared file.
-7. Use another client to request a write lock and show it queued.
-8. Release the read lock and show the writer being promoted.
-9. Write new content and show the file version and pub-sub event log update.
 
 ## Key Code Files
 
